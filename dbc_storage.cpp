@@ -35,20 +35,8 @@ namespace datastores
         _stringTable.assign(stringTableData, stringTableData + _header.StringBlockSize);
 
         // sparse tables can be loaded just like non-sparse if they don't have strings
-        LoadRecords(recordData);
-    }
-
-    template <typename T>
-    T* Storage<T>::GetRecord(uint32_t index)
-    {
-        return &_storage[index];
-    }
-
-    template <typename T>
-    void Storage<T>::LoadRecords(uint8_t const* data)
-    {
         for (uint32_t i = 0; i < _header.RecordCount; ++i)
-            CopyToMemory(i, data + (size_t) i * (size_t) meta_t::record_size);
+            CopyToMemory(i, fileData + (size_t)i * (size_t)meta_t::record_size);
     }
 
     template <typename T>

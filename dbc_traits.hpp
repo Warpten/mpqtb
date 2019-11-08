@@ -12,6 +12,7 @@ namespace datastores
     template <typename T> struct record_type {
         using type = std::nullptr_t;
     };
+
     template <> struct record_type<Startup_StringsMeta> {
         using type = Startup_StringsEntry;
     };

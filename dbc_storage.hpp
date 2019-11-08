@@ -46,14 +46,14 @@ namespace datastores
 
         inline pointer operator -> () const { return &_current; }
 
+        inline reference operator * () const {
+            return _current;
+        }
+
         iterator_impl<T, Impl>& operator ++ () {
             ++_itr;
             _current = _itr->second;
             return *this;
-        }
-
-        inline reference operator * () const {
-            return _current;
         }
 
         friend bool operator == (typename iterator_impl<T, Impl> const& r, typename iterator_impl<T, Impl> const& l) {
@@ -85,31 +85,34 @@ namespace datastores
         // Defined below
 
         using meta_t = typename meta_type<T>::type;
-        static_assert(!std::is_same<meta_t, std::nullptr_t>::value, "");
+        static_assert(!std::is_same<meta_t, std::nullptr_t>::value, "Metadata not found");
 
         using header_type = typename std::conditional<meta_t::sparse_storage, DB2Header, DBCHeader>::type;
         using record_type = T;
 
         Storage(uint8_t const* fileData);
 
-        void LoadRecords(uint8_t const* data);
+    private:
         void CopyToMemory(uint32_t index, uint8_t const* data);
-        T* GetRecord(uint32_t index);
 
     public:
+        T const& operator [] (size_t id) const { return _storage[id]; }
+
         using iterator = iterator_impl<T, typename std::unordered_map<uint32_t, T>::iterator>;
         using const_iterator = iterator_impl<const T, typename std::unordered_map<uint32_t, T>::const_iterator>;
         using reverse_iterator = std::reverse_iterator<iterator>;
         using const_reverse_iterator = std::reverse_iterator<const_iterator>;
 
-        /*iterator begin() noexcept { return iterator(_storage.begin()); }
-        iterator end() noexcept { return iterator(_storage.end()); }*/
+        // Only const interface exposed
+        // iterator begin() noexcept { return iterator(_storage.begin()); }
+        // iterator end() noexcept { return iterator(_storage.end()); }
 
         const_iterator begin() const noexcept { return const_iterator(_storage.begin()); }
         const_iterator end() const noexcept { return const_iterator(_storage.end()); }
 
-        /*reverse_iterator rbegin() noexcept { return reverse_iterator(begin()); }
-        reverse_iterator rend() noexcept { return reverse_iterator(end()); }*/
+        // Only const interface exposed
+        // reverse_iterator rbegin() noexcept { return reverse_iterator(begin()); }
+        // reverse_iterator rend() noexcept { return reverse_iterator(end()); }
 
         const_reverse_iterator rbegin() const noexcept { return const_reverse_iterator(begin()); }
         const_reverse_iterator rend() const noexcept { return const_reverse_iterator(end()); }
