@@ -51,11 +51,12 @@ namespace datastores
 
         iterator_impl<T, Impl>& operator ++ () {
             ++_itr;
+            _current = *_itr;
             return *this;
         }
 
         inline reference operator * () const {
-            return _itr->second;
+            return _current.second;
         }
 
         friend bool operator == (typename iterator_impl<T, Impl> const& r, typename iterator_impl<T, Impl> const& l) {
