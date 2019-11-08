@@ -22,20 +22,20 @@ namespace datastores
         if (fileHandle == nullptr)
             return;
 
-        get_storage().clear();
-        memcpy(&get_header(), fileHandle->GetData(), sizeof(header_type));
+        _storage.clear();
+        memcpy(&_header, fileHandle->GetData(), sizeof(header_type));
 
         if (!meta_t::sparse_storage)
-            assert(get_header().Magic == 'CBDW');
+            assert(_header.Magic == 'CBDW');
         else
-            assert(get_header().Magic == '2BDW');
+            assert(_header.Magic == '2BDW');
 
         uint8_t const* recordData = fileHandle->GetData() + sizeof(header_type);
         if constexpr (meta_t::sparse_storage)
-            recordData += (4uL + 2uL) * ((size_t) get_header().MaxIndex - (size_t)get_header().MinIndex + 1uL);
-        uint8_t const* stringTableData = recordData + (size_t) get_header().RecordCount * (size_t) get_header().RecordSize;
+            recordData += (4uL + 2uL) * ((size_t) _header.MaxIndex - (size_t)_header.MinIndex + 1uL);
+        uint8_t const* stringTableData = recordData + (size_t) _header.RecordCount * (size_t) _header.RecordSize;
 
-        get_string_table().assign(stringTableData, stringTableData + get_header().StringBlockSize);
+        _stringTable.assign(stringTableData, stringTableData + _header.StringBlockSize);
 
         // sparse tables can be loaded just like non-sparse if they don't have strings
         LoadRecords(recordData);
@@ -44,13 +44,13 @@ namespace datastores
     template <typename T>
     T* Storage<T>::GetRecord(uint32_t index)
     {
-        return &get_storage()[index];
+        return &_storage[index];
     }
 
     template <typename T>
     void Storage<T>::LoadRecords(uint8_t const* data)
     {
-        for (uint32_t i = 0; i < get_header().RecordCount; ++i)
+        for (uint32_t i = 0; i < _header.RecordCount; ++i)
             CopyToMemory(i, data + (size_t) i * (size_t) meta_t::record_size);
     }
 
@@ -60,7 +60,7 @@ namespace datastores
         static_assert(alignof(T) == 1, "Structures passed to Storage<T, ...> must be aligned to 1 byte. Use #pragma pack(push, 1)!");
 
         uint32_t memoryOffset = 0;
-        uint8_t* structure_ptr = reinterpret_cast<uint8_t*>(&get_storage()[*reinterpret_cast<uint32_t const*>(data)]); // fixme find indexof n
+        uint8_t* structure_ptr = reinterpret_cast<uint8_t*>(&_storage[*reinterpret_cast<uint32_t const*>(data)]); // fixme find indexof n
         for (uint32_t j = 0; j < meta_t::field_count; ++j)
         {
             uint8_t* memberTarget = structure_ptr + memoryOffset;
@@ -93,14 +93,14 @@ namespace datastores
                     if constexpr (true) // (!meta_t::sparse_storage) // WDB2 still has a string table
                     {
                         auto stringTableOffset = *reinterpret_cast<uint32_t const*>(data + meta_t::field_offsets[j] + 4u * i);
-                        const char* stringValue = reinterpret_cast<const char*>(&get_string_table()[stringTableOffset]);
+                        const char* stringValue = reinterpret_cast<const char*>(&_stringTable[stringTableOffset]);
                         *reinterpret_cast<uintptr_t*>(memberTarget) = reinterpret_cast<uintptr_t>(stringValue);
                     }
                     else
                     {
                         uint8_t const* recordMember = data + meta_t::field_offsets[j] + 4u * i;
                         size_t stringLength = strlen(reinterpret_cast<const char*>(recordMember));
-                        auto itr = &*get_string_table().insert(get_string_table().end(), recordMember, recordMember + stringLength);
+                        auto itr = &*_stringTable.insert(_stringTable.end(), recordMember, recordMember + stringLength);
                         *reinterpret_cast<uintptr_t*>(memberTarget) = *reinterpret_cast<uintptr_t*>(*itr);
                     }
 
@@ -129,27 +129,6 @@ namespace datastores
                 }
             }
         }
-    }
-
-    template <typename T>
-    auto Storage<T>::get_header() -> header_type&
-    {
-        static header_type header;
-        return header;
-    }
-
-    template <typename T>
-    auto Storage<T>::get_storage() -> std::unordered_map<uint32_t, T>&
-    {
-        static std::unordered_map<uint32_t, T> _storage;
-        return _storage;
-    }
-
-    template <typename T>
-    auto Storage<T>::get_string_table() -> std::vector<uint8_t>&
-    {
-        static std::vector<uint8_t> _stringTable;
-        return _stringTable;
     }
 
     template struct Storage<MapEntry>;
