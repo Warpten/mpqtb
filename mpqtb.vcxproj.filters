@@ -1,0 +1,44 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="Fichiers de ressources">
+      <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
+      <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
+    </Filter>
+    <Filter Include="fs">
+      <UniqueIdentifier>{91e0bf1e-5d68-43a0-9731-db3d4cf97643}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="fs\mpq">
+      <UniqueIdentifier>{81756e5e-845b-4526-bd31-808527b8ca77}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="datastore">
+      <UniqueIdentifier>{9b3e7261-e7e5-4afc-9ed8-36b90b545ea8}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="fs_mpq.cpp">
+      <Filter>fs\mpq</Filter>
+    </ClCompile>
+    <ClCompile Include="dbc_storage.cpp">
+      <Filter>datastore</Filter>
+    </ClCompile>
+    <ClCompile Include="mpqtb.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="fs_mpq.hpp">
+      <Filter>fs\mpq</Filter>
+    </ClInclude>
+    <ClInclude Include="dbc_meta.hpp">
+      <Filter>datastore</Filter>
+    </ClInclude>
+    <ClInclude Include="dbc_structures.hpp">
+      <Filter>datastore</Filter>
+    </ClInclude>
+    <ClInclude Include="dbc_traits.hpp">
+      <Filter>datastore</Filter>
+    </ClInclude>
+    <ClInclude Include="dbc_storage.hpp">
+      <Filter>datastore</Filter>
+    </ClInclude>
+  </ItemGroup>
+</Project>
