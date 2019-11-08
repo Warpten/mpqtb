@@ -21,7 +21,7 @@ datastores::Storage<T> open_from_mpq(fs::mpq::mpq_file_system const& fs) {
     using meta_t = typename datastores::meta_type<T>::type;
 
     auto handle = fs.OpenFile(meta_t::name());
-    return datastores::Storage<T>(handle.get());
+    return datastores::Storage<T>(handle->GetData());
 }
 
 int main(int argc, char* argv[]) {

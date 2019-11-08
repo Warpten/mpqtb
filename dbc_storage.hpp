@@ -5,13 +5,10 @@
 #include <type_traits>
 #include <unordered_map>
 
-#include "fs_mpq.hpp"
 #include "dbc_traits.hpp"
 
 namespace datastores
 {
-    using namespace fs;
-
     struct DBCHeader
     {
         uint32_t Magic;
@@ -51,12 +48,12 @@ namespace datastores
 
         iterator_impl<T, Impl>& operator ++ () {
             ++_itr;
-            _current = *_itr;
+            _current = _itr->second;
             return *this;
         }
 
         inline reference operator * () const {
-            return _current.second;
+            return _current;
         }
 
         friend bool operator == (typename iterator_impl<T, Impl> const& r, typename iterator_impl<T, Impl> const& l) {
@@ -93,7 +90,7 @@ namespace datastores
         using header_type = typename std::conditional<meta_t::sparse_storage, DB2Header, DBCHeader>::type;
         using record_type = T;
 
-        Storage(fs::mpq::mpq_file* fileHandle);
+        Storage(uint8_t const* fileData);
 
         void LoadRecords(uint8_t const* data);
         void CopyToMemory(uint32_t index, uint8_t const* data);

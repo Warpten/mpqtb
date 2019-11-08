@@ -14,23 +14,20 @@
 namespace datastores
 {
     template <typename T>
-    Storage<T>::Storage(fs::mpq::mpq_file* fileHandle)
+    Storage<T>::Storage(uint8_t const* fileData)
     {
-        std::string completeFilePath = "DBFilesClient\\";
-        completeFilePath += meta_t::name();
-
-        if (fileHandle == nullptr)
+        if (fileData == nullptr)
             return;
 
         _storage.clear();
-        memcpy(&_header, fileHandle->GetData(), sizeof(header_type));
+        memcpy(&_header, fileData, sizeof(header_type));
 
         if (!meta_t::sparse_storage)
             assert(_header.Magic == 'CBDW');
         else
             assert(_header.Magic == '2BDW');
 
-        uint8_t const* recordData = fileHandle->GetData() + sizeof(header_type);
+        uint8_t const* recordData = fileData + sizeof(header_type);
         if constexpr (meta_t::sparse_storage)
             recordData += (4uL + 2uL) * ((size_t) _header.MaxIndex - (size_t)_header.MinIndex + 1uL);
         uint8_t const* stringTableData = recordData + (size_t) _header.RecordCount * (size_t) _header.RecordSize;
