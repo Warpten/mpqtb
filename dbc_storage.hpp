@@ -42,17 +42,18 @@ namespace datastores
         using reference = std::add_lvalue_reference_t<value_type>;
         using iterator_category = typename Impl::iterator_category;
 
-        /* implicit */ iterator_impl(Impl itr) : _itr(itr), _current(itr->second) { }
+        /* implicit */ iterator_impl(Impl itr) : _itr(itr) { }
 
-        inline pointer operator -> () const { return &_current; }
+        inline pointer operator -> () const {
+            return &_itr->current;
+        }
 
         inline reference operator * () const {
-            return _current;
+            return (*_itr).second;
         }
 
         iterator_impl<T, Impl>& operator ++ () {
             ++_itr;
-            _current = _itr->second;
             return *this;
         }
 
@@ -66,7 +67,6 @@ namespace datastores
 
     private:
         Impl _itr;
-        typename Impl::value_type::second_type _current;
     };
 
     template <typename T>
@@ -92,11 +92,65 @@ namespace datastores
 
         Storage(uint8_t const* fileData);
 
+        Storage(Storage<T>&& storage) noexcept
+        {
+            Construct(std::move(storage));
+        }
+
+        Storage(Storage<T> const& storage) noexcept
+        {
+            Construct(storage);
+        }
+
+        inline Storage<T>& operator = (Storage<T>&& storage) noexcept
+        {
+            Construct(std::move(storage));
+            return *this;
+        }
+
+        inline Storage<T>& operator = (Storage<T> const& storage) noexcept
+        {
+            Construct(storage);
+            return *this;
+        }
+
     private:
-        void CopyToMemory(uint32_t index, uint8_t const* data);
+        void Construct(Storage<T>&& storage) noexcept
+        {
+            uintptr_t oldBase = reinterpret_cast<uintptr_t>(&storage._stringTable[0]);
+            _stringTable = std::move(storage._stringTable);
+            uintptr_t newBase = reinterpret_cast<uintptr_t>(&_stringTable[0]);
+
+            _storage = std::move(storage._storage);
+            _header = std::move(storage._header);
+
+            if (newBase != oldBase)
+                for (auto [key, value] : _storage)
+                    FixStringOffsets(&value, oldBase, newBase);
+        }
+
+        void Construct(Storage<T> const& storage) noexcept
+        {
+            uintptr_t oldBase = reinterpret_cast<uintptr_t>(&storage._stringTable[0]);
+
+            _stringTable.resize(storage._stringTable.size());
+            memcpy(_stringTable.data(), storage._stringTable.data(), _stringTable.size());
+
+            uintptr_t newBase = reinterpret_cast<uintptr_t>(&_stringTable[0]);
+
+            _storage = std::move(storage._storage);
+            _header = std::move(storage._header);
+
+            if (oldBase != newBase)
+                for (auto [key, value] : _storage)
+                    FixStringOffsets(&value, oldBase, newBase);
+        }
+
+        void FixStringOffsets(T* record, uintptr_t oldBase, uintptr_t newBase);
+        void LoadRecord(T* record, uint8_t const* inputData);
 
     public:
-        T const& operator [] (size_t id) const { return _storage[id]; }
+        inline T const& operator [] (uint32_t id) { return _storage[id]; }
 
         using iterator = iterator_impl<T, typename std::unordered_map<uint32_t, T>::iterator>;
         using const_iterator = iterator_impl<const T, typename std::unordered_map<uint32_t, T>::const_iterator>;

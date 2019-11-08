@@ -95,7 +95,6 @@ namespace fs {
             if (!SFileReadFile(_fileHandle, _fileData.data(), GetFileSize(), &bytesRead, nullptr))
                 throw std::runtime_error("Unable to read file");
 
-
             _fileData.resize(bytesRead);
 
             // Immediately close the handle, but don't call Close() - this would clear the buffer

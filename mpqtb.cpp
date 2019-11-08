@@ -20,7 +20,9 @@ template <typename T>
 datastores::Storage<T> open_from_mpq(fs::mpq::mpq_file_system const& fs) {
     using meta_t = typename datastores::meta_type<T>::type;
 
-    auto handle = fs.OpenFile(meta_t::name());
+    std::string filePath = "DBFilesClient/";
+    filePath += meta_t::name();
+    auto handle = fs.OpenFile(filePath);
     return datastores::Storage<T>(handle->GetData());
 }
 
