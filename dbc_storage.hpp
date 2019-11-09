@@ -171,6 +171,10 @@ namespace datastores
         const_reverse_iterator rbegin() const noexcept { return const_reverse_iterator(begin()); }
         const_reverse_iterator rend() const noexcept { return const_reverse_iterator(end()); }
 
+        size_t size() const { return _header.RecordCount; }
+
+        bool contains(uint32_t key) const { return _storage.find(key) != _storage.end(); }
+
     private:
         header_type _header;
         std::unordered_map<uint32_t, T> _storage;

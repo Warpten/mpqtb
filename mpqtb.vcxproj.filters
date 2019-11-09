@@ -14,6 +14,9 @@
     <Filter Include="datastore">
       <UniqueIdentifier>{9b3e7261-e7e5-4afc-9ed8-36b90b545ea8}</UniqueIdentifier>
     </Filter>
+    <Filter Include="fs\m2">
+      <UniqueIdentifier>{c178336f-05ad-434c-a542-8166c3d5d334}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="fs_mpq.cpp">
@@ -23,6 +26,9 @@
       <Filter>datastore</Filter>
     </ClCompile>
     <ClCompile Include="mpqtb.cpp" />
+    <ClCompile Include="m2.cpp">
+      <Filter>fs\m2</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="fs_mpq.hpp">
@@ -39,6 +45,12 @@
     </ClInclude>
     <ClInclude Include="dbc_storage.hpp">
       <Filter>datastore</Filter>
+    </ClInclude>
+    <ClInclude Include="m2.hpp">
+      <Filter>fs\m2</Filter>
+    </ClInclude>
+    <ClInclude Include="m2_types.hpp">
+      <Filter>fs\m2</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>
