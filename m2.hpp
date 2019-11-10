@@ -10,22 +10,8 @@ namespace fs {
     public:
         m2(const uint8_t* fileData, size_t fileSize);
 
-        template <typename T>
-        T* read() {
-            T* data = reinterpret_cast<T*>(_fileData + _cursor);
-            _cursor += sizeof(T);
-            return data;
-        }
-
-        template <typename T, size_t N>
-        std::array<T, N> read() {
-            std::array<T, N> arr;
-            memcpy(arr.data(), _fileData + _cursor, sizeof(T) * N);
-            return arr;
-        }
-
         void* base() {
-            return (void*) _fileData;
+            return (void*) _fileData.data();
         }
 
         struct header_t {
@@ -95,7 +81,6 @@ namespace fs {
         }
 
     private:
-        header_t _header;
         std::vector<uint8_t> _fileData;
     };
 }

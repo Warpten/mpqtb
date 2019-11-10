@@ -7,7 +7,7 @@ namespace fs {
         _fileData.resize(fileSize);
         memcpy(_fileData.data(), fileData, fileSize);
 
-        assert(_header.magic == '02DM' && "Non-handled M2 version");
+        assert(header()->magic == '02DM' && "Non-handled M2 version");
     }
 
     m2::header_t const* m2::header() const {
