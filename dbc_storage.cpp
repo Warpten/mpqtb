@@ -134,4 +134,5 @@ namespace datastores
     template struct Storage<ChrRacesEntry>;
     template struct Storage<CreatureModelDataEntry>;
     template struct Storage<CreatureDisplayInfoEntry>;
+    template struct Storage<VehicleSeatEntry>;
 }

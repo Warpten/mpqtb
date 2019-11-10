@@ -11,7 +11,7 @@
 
 std::string_view get_argument(std::vector<const char*> const& args, std::string_view key) {
     auto end = (++args.rbegin()).base();
-    for (auto itr = args.begin(); itr != end; ++itr)
+    for (auto itr = args.begin(); itr != end; itr += 2)
         if (key == *itr)
             return *(++itr);
 
@@ -30,10 +30,10 @@ datastores::Storage<T> open_dbc(fs::mpq::mpq_file_system const& fs) {
 
 fs::m2 open_m2(fs::mpq::mpq_file_system const& fs, std::string const& fileName) {
     auto fileHandle = fs.OpenFile(fileName);
-    return fs::m2(fileHandle->GetData());
+    return fs::m2(fileHandle->GetData(), fileHandle->GetFileSize());
 }
 
-bool replace(std::string& str, const std::string& from, const std::string& to) {
+bool replace(std::string& str, std::string_view from, std::string_view to) {
     size_t start_pos = str.find(from);
     if (start_pos == std::string::npos)
         return false;
@@ -52,22 +52,49 @@ int main(int argc, char* argv[]) {
     // Exclude binary path
     std::vector<const char*> arguments(argv + 1, argv + argc);
 
-    auto installPath = get_argument(arguments, "--installPath");
+    auto installPath = get_argument(arguments, "--installPath"); // Path to wow install
     fs::mpq::mpq_file_system fs(installPath);
 
     auto creatureDisplayInfo = open_dbc<CreatureDisplayInfoEntry>(fs);
     auto creatureModelData = open_dbc<CreatureModelDataEntry>(fs);
     auto vehicleSeat = open_dbc<VehicleSeatEntry>(fs);
 
-    std::set<uint32_t> processedModelIDs;
+    std::for_each(creatureModelData.begin(), creatureModelData.end(),
+        [&](CreatureModelDataEntry const& cmde) -> void {
+            if (cmde.ModelName == nullptr)
+                return;
 
-    std::for_each(vehicleSeat.begin(), vehicleSeat.end(),
-    [&processedModelIDs, &fs, &creatureModelData, &creatureDisplayInfo](VehicleSeatEntry const& vse) -> void
-    {
-        auto attachmentID = g_vehicleGeoComponentsLinks[vse.AttachmentID];
-        auto passengerAttachmentID = vse.Passenger.AttachmentID; // Not a typo, this one is directly used
+            // Fix MDX to M2 and uppercase everything
+            std::string modelName = cmde.ModelName;
+            std::transform(modelName.begin(), modelName.end(), modelName.begin(), ::toupper);
+            replace(modelName, ".MDX", ".M2");
 
-    });
+            auto modelFile = open_m2(fs, modelName);
+
+            auto header = modelFile.header();
+
+            auto attachments = (modelFile << header->attachments);
+            auto boneLookups = (modelFile << header->boneCombos);
+            auto bones       = (modelFile << header->bones);
+
+            for (auto&& attachment : attachments)
+            {
+                if (attachment.bone > header->boneCombos.count)
+                    continue;
+
+                auto boneIndex = boneLookups[attachment.bone];
+                if (boneIndex > header->bones.count)
+                    continue;
+
+                auto&& attachmentPosition = attachment.position;
+                auto attachmentDistance = attachmentPosition.length();
+                float offsetScale = 0.0f; // GetTrueScale(unit)
+                if (attachmentDistance >= 0.0f)
+                    offsetScale /= attachmentDistance;
+
+                // Apply model scale to VehicleSeatEntry::AttachmentOffset.
+            }
+        });
 
     return 0;
 }

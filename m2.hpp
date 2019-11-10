@@ -8,7 +8,7 @@
 namespace fs {
     class m2 : public std::enable_shared_from_this<m2> {
     public:
-        m2(const uint8_t* fileData);
+        m2(const uint8_t* fileData, size_t fileSize);
 
         template <typename T>
         T* read() {
@@ -85,12 +85,17 @@ namespace fs {
 #endif*/
         };
 
-        header_t const& header() const {
-            return _header;
+        header_t const* header() const;
+
+        template <typename T>
+        std::vector<T> operator << (M2Array<T> const& arr) {
+            std::vector<T> v(arr.count);
+            memcpy(v.data(), reinterpret_cast<uint8_t*>(base()) + arr.offset, arr.count * sizeof(T));
+            return v;
         }
+
     private:
         header_t _header;
-        const uint8_t* _fileData;
-        size_t _cursor;
+        std::vector<uint8_t> _fileData;
     };
 }

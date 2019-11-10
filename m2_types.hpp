@@ -11,19 +11,6 @@ namespace fs {
     struct M2Array {
         uint32_t count;
         uint32_t offset; // pointer to T, relative to begin of m2 data block (i.e. MD21 chunk content or begin of file)
-
-        inline T* read(m2 const& model, size_t index) const {
-            if (index >= count)
-                throw std::runtime_error("index too large");
-
-            return reinterpret_cast<T*>(reinterpret_cast<uint8_t*>(model.base()) + offset + sizeof(T) * index);
-        }
-
-        inline std::vector<T> operator >> (m2 const& model) {
-            std::vector<T> v(count);
-            memcpy(v.data(), model.base() + offset, model.base() + offset + count * sizeof(T));
-            return v;
-        }
     };
 
     template<typename T>
@@ -62,6 +49,14 @@ namespace fs {
         float x;
         float y;
         float z;
+
+        float length() const {
+            return std::sqrt(lengthSquared());
+        }
+
+        float lengthSquared() const {
+            return x * x + y * y + z * z;
+        }
     };
 
     struct C4Quaternion {

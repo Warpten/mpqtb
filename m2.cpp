@@ -3,10 +3,14 @@
 #include <cassert>
 
 namespace fs {
-    m2::m2(uint8_t const* fileData) : _fileData(fileData) {
-        memcpy(&_header, fileData, sizeof(_header));
-        _cursor = sizeof(_header);
+    m2::m2(uint8_t const* fileData, size_t fileSize) {
+        _fileData.resize(fileSize);
+        memcpy(_fileData.data(), fileData, fileSize);
 
         assert(_header.magic == '02DM' && "Non-handled M2 version");
+    }
+
+    m2::header_t const* m2::header() const {
+        return reinterpret_cast<const header_t*>(_fileData.data());
     }
 }
