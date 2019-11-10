@@ -92,7 +92,7 @@ namespace fs {
 
             _fileData.resize(GetFileSize());
             DWORD bytesRead;
-            if (!SFileReadFile(_fileHandle, _fileData.data(), GetFileSize(), &bytesRead, nullptr))
+            if (!SFileReadFile(_fileHandle, _fileData.data(), _fileData.size(), &bytesRead, nullptr))
                 throw std::runtime_error("Unable to read file");
 
             _fileData.resize(bytesRead);
@@ -120,9 +120,7 @@ namespace fs {
 
         size_t mpq_file::GetFileSize() const
         {
-            DWORD fileSizeHigh = 0;
-            DWORD fileSizeLow = SFileGetFileSize(_fileHandle, &fileSizeHigh);
-            return static_cast<size_t>(fileSizeLow) | (static_cast<size_t>(fileSizeHigh) << 32u);
+            return _fileData.size();
         }
 
         uint8_t const* mpq_file::GetData()
