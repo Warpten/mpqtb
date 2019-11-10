@@ -90,7 +90,11 @@ namespace fs {
         {
             _fileHandle = fileHandle;
 
-            _fileData.resize(GetFileSize());
+            DWORD fileSizeHigh = 0;
+            DWORD fileSizeLow = SFileGetFileSize(_fileHandle, &fileSizeHigh);
+            size_t publishedSize = static_cast<size_t>(fileSizeLow) | (static_cast<size_t>(fileSizeHigh) << 32u);
+
+            _fileData.resize(publishedSize);
             DWORD bytesRead;
             if (!SFileReadFile(_fileHandle, _fileData.data(), _fileData.size(), &bytesRead, nullptr))
                 throw std::runtime_error("Unable to read file");
