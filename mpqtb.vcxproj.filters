@@ -17,6 +17,9 @@
     <Filter Include="fs\m2">
       <UniqueIdentifier>{c178336f-05ad-434c-a542-8166c3d5d334}</UniqueIdentifier>
     </Filter>
+    <Filter Include="fs\casc">
+      <UniqueIdentifier>{bf84b4a7-287c-4393-9cfb-119148dd1b36}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="fs_mpq.cpp">
@@ -28,6 +31,9 @@
     <ClCompile Include="mpqtb.cpp" />
     <ClCompile Include="m2.cpp">
       <Filter>fs\m2</Filter>
+    </ClCompile>
+    <ClCompile Include="fs_casc.cpp">
+      <Filter>fs\casc</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -51,6 +57,9 @@
     </ClInclude>
     <ClInclude Include="m2_types.hpp">
       <Filter>fs\m2</Filter>
+    </ClInclude>
+    <ClInclude Include="fs_casc.hpp">
+      <Filter>fs\casc</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

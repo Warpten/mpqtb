@@ -135,12 +135,14 @@
     <ClInclude Include="dbc_storage.hpp" />
     <ClInclude Include="dbc_structures.hpp" />
     <ClInclude Include="dbc_traits.hpp" />
+    <ClInclude Include="fs_casc.hpp" />
     <ClInclude Include="fs_mpq.hpp" />
     <ClInclude Include="m2.hpp" />
     <ClInclude Include="m2_types.hpp" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="dbc_storage.cpp" />
+    <ClCompile Include="fs_casc.cpp" />
     <ClCompile Include="fs_mpq.cpp" />
     <ClCompile Include="m2.cpp" />
     <ClCompile Include="mpqtb.cpp" />

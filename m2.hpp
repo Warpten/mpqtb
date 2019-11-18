@@ -5,7 +5,7 @@
 
 #include "m2_types.hpp"
 
-namespace fs {
+namespace wow {
     class m2 : public std::enable_shared_from_this<m2> {
     public:
         m2(const uint8_t* fileData, size_t fileSize);

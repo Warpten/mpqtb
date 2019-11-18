@@ -59,7 +59,7 @@ namespace fs {
             _archiveHandles.clear();
         }
 
-        std::shared_ptr<mpq_file> mpq_file_system::OpenFile(const std::string& filePath) const
+        std::shared_ptr<mpq_file> mpq_file_system::open_file(const std::string& filePath) const
         {
             for (HANDLE archiveHandle : _archiveHandles)
             {
@@ -68,22 +68,7 @@ namespace fs {
                     return std::shared_ptr<mpq_file>(new mpq_file(fileHandle));
             }
 
-            return { };
-        }
-
-        bool mpq_file_system::FileExists(const std::string& relFilePath) const
-        {
-            for (HANDLE archiveHandle : _archiveHandles)
-            {
-                HANDLE fileHandle;
-                if (SFileOpenFileEx(archiveHandle, relFilePath.c_str(), 0, &fileHandle))
-                {
-                    SFileCloseFile(archiveHandle);
-                    return true;
-                }
-            }
-
-            return false;
+            throw std::runtime_error("file not found");
         }
 
         mpq_file::mpq_file(HANDLE fileHandle)

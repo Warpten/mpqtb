@@ -2,7 +2,7 @@
 
 #include <cassert>
 
-namespace fs {
+namespace wow {
     m2::m2(uint8_t const* fileData, size_t fileSize) {
         _fileData.resize(fileSize);
         memcpy(_fileData.data(), fileData, fileSize);

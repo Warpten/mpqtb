@@ -4,7 +4,7 @@
 #include <vector>
 #include <stdexcept>
 
-namespace fs {
+namespace wow {
     class m2;
 
     template<typename T>

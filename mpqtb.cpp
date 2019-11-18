@@ -28,9 +28,9 @@ datastores::Storage<T> open_dbc(fs::mpq::mpq_file_system const& fs) {
     return datastores::Storage<T>(handle->GetData());
 }
 
-fs::m2 open_m2(fs::mpq::mpq_file_system const& fs, std::string const& fileName) {
+wow::m2 open_m2(fs::mpq::mpq_file_system const& fs, std::string const& fileName) {
     auto fileHandle = fs.OpenFile(fileName);
-    return fs::m2(fileHandle->GetData(), fileHandle->GetFileSize());
+    return wow::m2(fileHandle->GetData(), fileHandle->GetFileSize());
 }
 
 bool replace(std::string& str, std::string_view from, std::string_view to) {

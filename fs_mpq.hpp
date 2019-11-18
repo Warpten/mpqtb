@@ -36,9 +36,7 @@ namespace fs {
             mpq_file_system(std::string_view rootFolder);
             ~mpq_file_system();
 
-            std::shared_ptr<mpq_file> OpenFile(const std::string& filePath) const;
-
-            bool FileExists(const std::string& relFilePath) const;
+            std::shared_ptr<mpq_file> open_file(const std::string& filePath) const;
 
         private:
             std::vector<HANDLE> _archiveHandles;
