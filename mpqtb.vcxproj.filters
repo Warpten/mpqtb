@@ -20,6 +20,9 @@
     <Filter Include="fs\casc">
       <UniqueIdentifier>{bf84b4a7-287c-4393-9cfb-119148dd1b36}</UniqueIdentifier>
     </Filter>
+    <Filter Include="db">
+      <UniqueIdentifier>{2bf5d163-46b2-4dfc-84f9-e8735f236138}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="fs_mpq.cpp">
@@ -34,6 +37,9 @@
     </ClCompile>
     <ClCompile Include="fs_casc.cpp">
       <Filter>fs\casc</Filter>
+    </ClCompile>
+    <ClCompile Include="mysql.cpp">
+      <Filter>db</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -60,6 +66,9 @@
     </ClInclude>
     <ClInclude Include="fs_casc.hpp">
       <Filter>fs\casc</Filter>
+    </ClInclude>
+    <ClInclude Include="mysql.hpp">
+      <Filter>db</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

@@ -80,7 +80,8 @@
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
-      <AdditionalLibraryDirectories>$(ProjectDir)stormlib\bin\StormLib\Win32\DebugAD;$(ProjectDir)casclib\bin\CascLib\Win32\ReleaseAD;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>C:\Program Files\MySQL\MySQL Server 8.0\lib;$(ProjectDir)stormlib\bin\StormLib\Win32\DebugAD;$(ProjectDir)casclib\bin\CascLib\Win32\ReleaseAD;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>libmysql.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
@@ -93,7 +94,8 @@
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
-      <AdditionalLibraryDirectories>$(ProjectDir)stormlib\bin\StormLib\x64\DebugAD;$(ProjectDir)casclib\bin\CascLib\x64\DebugAD;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>C:\Program Files\MySQL\MySQL Server 8.0\lib;$(ProjectDir)stormlib\bin\StormLib\x64\DebugAD;$(ProjectDir)casclib\bin\CascLib\x64\DebugAD;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>libmysql.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
@@ -105,12 +107,14 @@
       <SDLCheck>true</SDLCheck>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp17</LanguageStandard>
+      <AdditionalIncludeDirectories>C:\Program Files\MySQL\MySQL Server 8.0\include</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
-      <AdditionalLibraryDirectories>$(ProjectDir)stormlib\bin\StormLib\Win32\ReleaseAD;$(ProjectDir)casclib\bin\CascLib\Win32\ReleaseAD;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>C:\Program Files\MySQL\MySQL Server 8.0\lib;$(ProjectDir)stormlib\bin\StormLib\Win32\ReleaseAD;$(ProjectDir)casclib\bin\CascLib\Win32\ReleaseAD;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>libmysql.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -122,12 +126,14 @@
       <SDLCheck>true</SDLCheck>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp17</LanguageStandard>
+      <AdditionalIncludeDirectories>C:\Program Files\MySQL\MySQL Server 8.0\include</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
-      <AdditionalLibraryDirectories>$(ProjectDir)stormlib\bin\StormLib\x64\ReleaseAD;$(ProjectDir)casclib\bin\CascLib\x64\ReleaseAD;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>C:\Program Files\MySQL\MySQL Server 8.0\lib;$(ProjectDir)stormlib\bin\StormLib\x64\ReleaseAD;$(ProjectDir)casclib\bin\CascLib\x64\ReleaseAD;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>libmysql.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
@@ -139,6 +145,7 @@
     <ClInclude Include="fs_mpq.hpp" />
     <ClInclude Include="m2.hpp" />
     <ClInclude Include="m2_types.hpp" />
+    <ClInclude Include="mysql.hpp" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="dbc_storage.cpp" />
@@ -146,6 +153,7 @@
     <ClCompile Include="fs_mpq.cpp" />
     <ClCompile Include="m2.cpp" />
     <ClCompile Include="mpqtb.cpp" />
+    <ClCompile Include="mysql.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

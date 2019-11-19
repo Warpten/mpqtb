@@ -79,7 +79,7 @@ namespace datastores
         {
 #if !defined(_WIN64) && !defined(__x86_64__ ) && !defined(__ppc64__)
             memcpy(outputData, inputData, sizeof(T));
-            FixStringOffsets(record, 0, &_stringTable[0]);
+            FixStringOffsets(record, 0, reinterpret_cast<uintptr_t>(&_stringTable[0]));
 #else
             uint32_t arraySize = meta_t::field_sizes[i];
             uint32_t memberDiskSize = arraySize;
