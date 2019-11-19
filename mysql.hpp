@@ -4,6 +4,7 @@
 
 #include <string_view>
 #include <optional>
+#include <functional>
 #include <vector>
 
 // never ever have i written something as repulsive as this. do not touch
@@ -25,45 +26,11 @@ namespace db
     };
 
     struct result_set final {
-    private:
-        template <typename T>
-        struct transformer { };
-
-        template <>
-        struct transformer<std::string> {
-            std::string transform(char* value) const {
-                return value;
-            }
-        };
-
-        template <>
-        struct transformer<const char*> {
-            const char* transform(char* value) const {
-                return const_cast<const char*>(value);
-            }
-        };
-
-        template <>
-        struct transformer<uint32_t> {
-            uint32_t transform(char* value) const {
-                return std::atoi(value);
-            }
-        };
-
-        template <>
-        struct transformer<float> {
-            float transform(char* value) const {
-                return std::atof(value);
-            }
-        };
-
-    public:
-
-        result_set(MYSQL_RES* res) : _res(res) {
-            auto fieldCount = mysql_num_fields(res);
+        result_set(MYSQL_RES* res) : _res(res), _seqIndex(0) {
+            auto fieldCount = mysql_num_fields(_res);
             _fields.resize(fieldCount);
 
-            MYSQL_FIELD* fields = mysql_fetch_fields(res);
+            MYSQL_FIELD* fields = mysql_fetch_fields(_res);
             memcpy(_fields.data(), fields, sizeof(MYSQL_FIELD) * fieldCount);
 
             // Fetch first record
@@ -89,6 +56,8 @@ namespace db
         }
 
         inline result_set& operator ++ () {
+            _seqIndex = 0;
+
             auto row = mysql_fetch_row(_res);
             if (row == nullptr)
                 _row = std::nullopt;
@@ -98,7 +67,7 @@ namespace db
             return *this;
         }
 
-        template <typename T, typename Fn>
+        template <typename T, typename Fn = std::function<T(char*)>>
         inline T get(size_t fx, Fn fn) const {
             if (fx >= _fields.size())
                 throw std::runtime_error("field index too big");
@@ -109,7 +78,7 @@ namespace db
             return fn(_row.value()[fx]);
         }
 
-        template <typename T, typename Fn>
+        template <typename T, typename Fn = std::function<T(char*)>>
         inline T get(std::string_view fnm, Fn fn) const {
             size_t index = 0;
             for (auto&& field : _fields) {
@@ -122,9 +91,46 @@ namespace db
             return get(index);
         }
 
+        inline result_set& operator >> (std::string& value) {
+            value = get<std::string>(_seqIndex++, [](char* v) { return v; });
+            return *this;
+        }
+
+        inline result_set& operator >> (float& value) {
+            value = get<float>(_seqIndex++, [](char* v) { return static_cast<float>(std::atof(v)); });
+            return *this;
+        }
+
+#define MAKE_ATOI_STREAM_OP(TYPE)                                                                             \
+        inline result_set& operator >> (TYPE& value) {                                                        \
+            value = get<TYPE>(_seqIndex++, [](char* v) -> TYPE { return static_cast<TYPE>(std::atoi(v)); });  \
+            return *this;                                                                                     \
+        }
+
+        MAKE_ATOI_STREAM_OP(uint8_t)
+        MAKE_ATOI_STREAM_OP(uint16_t)
+        MAKE_ATOI_STREAM_OP(uint32_t)
+        MAKE_ATOI_STREAM_OP(uint64_t)
+
+        MAKE_ATOI_STREAM_OP(int8_t)
+        MAKE_ATOI_STREAM_OP(int16_t)
+        MAKE_ATOI_STREAM_OP(int32_t)
+        MAKE_ATOI_STREAM_OP(int64_t)
+#undef MAKE_ATOI_STREAM_OP
+
+        template <typename T, size_t N>
+        inline result_set& operator >> (std::array<T, N>& value) {
+            for (int i = 0; i < N; ++i)
+                *this >> value[i];
+            return *this;
+        }
+
     private:
         MYSQL_RES* _res;
+        
         std::optional<MYSQL_ROW> _row;
         std::vector<MYSQL_FIELD> _fields;
+
+        size_t _seqIndex;
     };
 }

@@ -1,6 +1,7 @@
 #include "fs_mpq.hpp"
 #include "dbc_storage.hpp"
 #include "m2.hpp"
+#include "mysql.hpp"
 
 #include <vector>
 #include <stdexcept>
@@ -256,43 +257,24 @@ int main(int argc, char* argv[]) {
     auto creatureDisplayInfo = open_dbc<CreatureDisplayInfoEntry>(fs);
     auto creatureModelData = open_dbc<CreatureModelDataEntry>(fs);
     auto vehicleSeat = open_dbc<VehicleSeatEntry>(fs);
+    auto vehicle = open_dbc<VehicleEntry>(fs);
 
-    std::for_each(creatureModelData.begin(), creatureModelData.end(),
-        [&](CreatureModelDataEntry const& cmde) -> void {
-            if (cmde.ModelName == nullptr)
-                return;
+    db::mysql db("localhost", 3306, "root", "root", "world");
+    auto result = db.select("SELECT `entry`, `modelid1`, `modelid2`, `modelid3`, `modelid4`, `name`, `VehicleID` FROM `creature_template` WHERE `VehicleID` <> 0");
 
-            // Fix MDX to M2 and uppercase everything
-            std::string modelName = cmde.ModelName;
-            std::transform(modelName.begin(), modelName.end(), modelName.begin(), ::toupper);
-            replace(modelName, ".MDX", ".M2");
+    while (result) {
+        uint32_t entry;
+        std::array<uint32_t, 4> modelIDs;
+        std::string creatureName;
+        uint32_t vehicleID;
 
-            auto modelFile = open_m2(fs, modelName);
+        result >> entry >> modelIDs >> creatureName >> vehicleID;
 
-            auto header = modelFile.header();
+        VehicleEntry const& vehicleEntry = vehicle[vehicleID];
+        std::cout << "Creature #" << entry << " (" << creatureName << ") uses Vehicle #" << vehicleID << std::endl;
 
-            auto attachments = (modelFile << header->attachments);
-            auto boneLookups = (modelFile << header->boneCombos);
-            auto bones       = (modelFile << header->bones);
-
-            for (auto&& attachment : attachments)
-            {
-                if (attachment.bone > header->boneCombos.count)
-                    continue;
-
-                auto boneIndex = boneLookups[attachment.bone];
-                if (boneIndex > header->bones.count)
-                    continue;
-
-                auto&& attachmentPosition = attachment.position;
-                auto attachmentDistance = attachmentPosition.length();
-                float offsetScale = 0.0f; // GetTrueScale(unit)
-                if (attachmentDistance >= 0.0f)
-                    offsetScale /= attachmentDistance;
-
-                // Apply model scale to VehicleSeatEntry::AttachmentOffset.
-            }
-        });
+        ++result;
+    }
 
     return 0;
 }
