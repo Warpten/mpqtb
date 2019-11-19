@@ -10,7 +10,7 @@ namespace wow {
     public:
         m2(const uint8_t* fileData, size_t fileSize);
 
-        void* base() {
+        void* base() const {
             return (void*) _fileData.data();
         }
 
