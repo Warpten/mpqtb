@@ -59,6 +59,25 @@ namespace wow {
         }
     };
 
+    struct C4Vector {
+        float x;
+        float y;
+        float z;
+        float o;
+    };
+
+    struct C44Matrix {
+        C4Vector columns[4];
+
+        C4Vector& operator[] (size_t sz) {
+            return columns[sz];
+        }
+
+        C4Vector const& operator[] (size_t sz) const {
+            return columns[sz];
+        }
+    };
+
     struct C4Quaternion {
         float x;
         float y;

@@ -33,8 +33,22 @@ namespace fs {
         class casc_file_system final
         {
         public:
-            using content_key = uint8_t[16];
-            using encoding_key = uint8_t[16];
+#define KEY(NAME)                                          \
+            struct NAME {                                  \
+                uint8_t operator [] (size_t i) const {     \
+                    return bytes[i];                       \
+                }                                          \
+                                                           \
+                inline operator uint8_t* () {              \
+                    return bytes;                          \
+                }                                          \
+                                                           \
+            private:                                       \
+                uint8_t bytes[16];                         \
+            };
+            KEY(encoding_key);
+            KEY(content_key);
+#undef KEY
 
             casc_file_system(std::string_view rootFolder, std::string_view product = "wow");
             ~casc_file_system();

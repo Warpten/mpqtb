@@ -74,7 +74,7 @@ namespace wow {
         header_t const* header() const;
 
         template <typename T>
-        std::vector<T> operator << (M2Array<T> const& arr) {
+        std::vector<T> operator << (M2Array<T> const& arr) const {
             std::vector<T> v(arr.count);
             memcpy(v.data(), reinterpret_cast<uint8_t*>(base()) + arr.offset, arr.count * sizeof(T));
             return v;
