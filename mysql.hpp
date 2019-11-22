@@ -1,6 +1,6 @@
 #pragma once
 
-#include <mysql.h>
+#include <mysql/mysql.h>
 
 #include <string_view>
 #include <optional>
@@ -62,7 +62,7 @@ namespace db
             if (row == nullptr)
                 _row = std::nullopt;
             else
-                _row.value() = row;
+                _row = std::make_optional(row);
 
             return *this;
         }

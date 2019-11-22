@@ -33,7 +33,7 @@ namespace wow {
             M2Array<M2Sequence> sequences;                       // Information about the animations in the model.
             M2Array<uint16_t> sequenceIdxHashById;               // Mapping of sequence IDs to the entries in the Animation sequences block.
             M2Array<M2CompBone> bones;                           // MAX_BONES = 0x100 => Creature\SlimeGiant\GiantSlime.M2 has 312 bones (Wrath)
-            M2Array<uint16_t> boneIndicesById;                   // Lookup table for key skeletal bones. (alt. name: key_bone_lookup)
+            M2Array<int16_t> boneIndicesById;                    // Lookup table for key skeletal bones. (alt. name: key_bone_lookup)
             M2Array<M2Vertex> vertices;
             uint32_t num_skin_profiles;                          // Views (LOD) are now in .skins.
             M2Array<M2Color> colors;                             // Color and alpha animations definitions.
@@ -55,7 +55,7 @@ namespace wow {
             M2Array<C3Vector> collisionPositions;                // (alt. name: collision_vertices)
             M2Array<C3Vector> collisionFaceNormals;              // (alt. name: collision_normals) 
             M2Array<M2Attachment> attachments;                   // position of equipped weapons or effects
-            M2Array<uint16_t> attachmentIndicesById;             // (alt. name: attachment_lookup_table)
+            M2Array<int16_t> attachmentIndicesById;              // (alt. name: attachment_lookup_table)
             M2Array<M2Event> events;                             // Used for playing sounds when dying and a lot else.
             M2Array<M2Light> lights;                             // Lights are mainly used in loginscreens but in wands and some doodads too.
             M2Array<M2Camera> cameras;                           // The cameras are present in most models for having a model in the character tab. 

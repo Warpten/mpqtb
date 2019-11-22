@@ -18,7 +18,7 @@ namespace fs {
 
                 if (itr->path().extension() != ".MPQ")
                     continue;
-
+                
                 HANDLE fileHandle;
                 if (SFileOpenArchive(itr->path().generic_string().c_str(), 0, MPQ_OPEN_READ_ONLY, &fileHandle))
                     handles.push_back(fileHandle);

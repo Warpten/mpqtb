@@ -23,6 +23,9 @@
     <Filter Include="db">
       <UniqueIdentifier>{2bf5d163-46b2-4dfc-84f9-e8735f236138}</UniqueIdentifier>
     </Filter>
+    <Filter Include="geometry">
+      <UniqueIdentifier>{7217b8cc-dfde-45bf-a96e-b648b495f324}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="fs_mpq.cpp">
@@ -69,6 +72,12 @@
     </ClInclude>
     <ClInclude Include="mysql.hpp">
       <Filter>db</Filter>
+    </ClInclude>
+    <ClInclude Include="matrices.hpp">
+      <Filter>geometry</Filter>
+    </ClInclude>
+    <ClInclude Include="vectors.hpp">
+      <Filter>geometry</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

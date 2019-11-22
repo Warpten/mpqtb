@@ -3,6 +3,9 @@
 #include "m2.hpp"
 #include "mysql.hpp"
 
+#include "vectors.hpp"
+#include "matrices.hpp"
+
 #include <vector>
 #include <stdexcept>
 #include <algorithm>
@@ -47,34 +50,31 @@ constexpr static const uint32_t g_vehicleGeoComponentsLinks[] = {
     0x27, 0x28, 0x29, 0x2A, 0x2B, 0x2C, 0x2D, 0x2E, 0x00, 0x2F, 0x30, 0x06, 0x05
 };
 
-bool getAttachmentPivot(wow::m2 const& model, uint32_t attachmentID, wow::C3Vector& pPivot) {
+
+bool hasAttachment(wow::m2 const& model, uint32_t attachmentId) {
+    auto attachmentIndicesById = (model << model.header()->attachmentIndicesById);
+    auto attachments = (model << model.header()->attachments);
+
+    if (attachmentId < attachmentIndicesById.size())
+        return attachmentIndicesById[attachmentId] < attachments.size();
+
+    return attachments.size() > 0xFFFF;
+}
+
+std::optional<wow::C3Vector> getAttachmentPivot(wow::m2 const& model, uint32_t attachmentID) {
     auto header = model.header();
 
     auto attachmentIndice = -1;
     if (attachmentID < header->attachmentIndicesById.count)
         attachmentIndice = (model << header->attachmentIndicesById)[attachmentID];
     else
-        return false;
+        return std::nullopt;
 
     auto attachments = (model << header->attachments);
-    memcpy(&pPivot, &attachments[attachmentIndice].position, sizeof(wow::C3Vector));
-    return true;
-}
+    if (attachmentIndice > attachments.size())
+        return std::nullopt;
 
-bool onVehicleSeatRecUpdate(datastores::VehicleSeatEntry const& vse, wow::m2 const& model, wow::C3Vector& pPivot) {
-    if (!getAttachmentPivot(model, vse.Passenger.AttachmentID, pPivot)) {
-        pPivot.x = 0.0f;
-        pPivot.y = 0.0f;
-        pPivot.z = 0.0f;
-
-        return false;
-    } else {
-        pPivot.x *= -1.0f;
-        pPivot.y *= -1.0f;
-        pPivot.z *= -1.0f;
-
-        return true;
-    }
+    return attachments[attachmentIndice].position;
 }
 
 void make_identity(wow::C44Matrix& m) {
@@ -109,6 +109,19 @@ void translate(wow::C44Matrix& m, wow::C3Vector const& v) {
     m[3].z = (((m[2].z * v.z) + (v5 * v.y)) + (m[0].z * v.x)) + m[3].z;
 }
 
+void translate(wow::C44Matrix& m, wow::C4Vector const& v) { // UNVERIFIED
+    float v3; // xmm1_4
+    float v4; // xmm0_4
+    float v5; // xmm1_4
+
+    v3 = m[1].y;
+    m[3].x = (((m[2].x * v.z) + (m[1].x * v.y)) + (v.x * m[0].x)) + m[3].x * v.o;
+    v4 = (((m[2].y * v.z) + (v3 * v.y)) + (m[0].y * v.x)) + m[3].y * v.o;
+    v5 = m[1].z;
+    m[3].y = v4;
+    m[3].z = (((m[2].z * v.z) + (v5 * v.y)) + (m[0].z * v.x)) + m[3].z * v.o;
+}
+
 void scale(wow::C44Matrix& m, float s)
 {
     m[0].x = m[0].x * s;
@@ -122,128 +135,350 @@ void scale(wow::C44Matrix& m, float s)
     m[2].z = m[2].z * s;
 }
 
-bool getAttachmentWorldTransform(wow::m2 const& model, wow::C44Matrix& ret, uint32_t attachmentID) {
-    // this retrieves the bone's own positioning matrix
-    // however this is a function of animation data
-    // and it then gets translated by attachment position
-    // so we just make an identity matrix and translate it
-    make_identity(ret);
+struct CVehiclePassenger_C
+{
+    struct matref {
+        bool _hasValue;
+        wow::C44Matrix _mat;
 
-    if (attachmentID < 0 || attachmentID >= model.header()->attachmentIndicesById.count)
-        return false;
+        matref() : _hasValue(false) { }
+        matref(wow::C44Matrix const& m) : _mat(m), _hasValue(true) {
+        }
 
-    auto attachmentIndices = (model << model.header()->attachmentIndicesById);
-    auto attachments = (model << model.header()->attachments);
+        inline wow::C44Matrix& operator = (wow::C44Matrix const& m) {
+            _mat = m;
+            return _mat;
+        }
 
-    auto idx = attachmentIndices[attachmentID];
-    translate(ret, attachments[idx].position);
-    return true;
-}
+        inline wow::C44Matrix const& value() const { return _mat; }
+        inline wow::C44Matrix& value() { return _mat; }
+        inline operator bool() const { return _hasValue; }
+    };
 
-float getTrueScale() {
-    return 1.0f; // fixme
-}
+    CVehiclePassenger_C(wow::m2 const& model, datastores::CreatureDisplayInfoEntry const& cde, datastores::CreatureModelDataEntry const& cmd) : model(model), cdi(cde), cmd(cmd) { }
 
-void computeModelTransform(wow::C44Matrix& modelTransform, wow::m2 const& model, datastores::VehicleSeatEntry const& vse, uint32_t attachmentID, float unk) {
-    wow::C44Matrix worldTransform;
-    bool hasAttachment = getAttachmentWorldTransform(model, worldTransform, attachmentID);
+    wow::C44Matrix getAttachmentWorldTransform(int attachmentID) {
+        auto attachmentIndices = (model << model.header()->attachmentIndicesById);
+        auto attachments = (model << model.header()->attachments);
 
-    float attachmentScale = getTrueScale();
-    if (hasAttachment) {
-        float dist = std::sqrt(worldTransform[0].z * worldTransform[0].z
-            + worldTransform[0].y * worldTransform[0].y
-            + worldTransform[0].x * worldTransform[0].x);
+        int16_t bone = 0;
+        int16_t attachmentIndice = -1;
+        if (attachmentID >= 0 && attachmentID < attachmentIndices.size()) {
+            attachmentIndice = attachmentIndices[attachmentID];
+            if (attachmentIndice >= 0 && attachmentIndice < attachments.size())
+                bone = attachments[attachmentIndice].bone;
+        }
 
-        attachmentScale = 1.0f;
+        animate();
 
-        float scale = getTrueScale(); // ...
-        if (dist > 0.0000f)
-            scale /= dist;
-
-        ::scale(worldTransform, scale);
-    }
-    else {
-        ::scale(modelTransform, attachmentScale);
-    }
-
-    wow::C3Vector scaledAttachmentOffset = vse.AttachmentOffset;
-    scaledAttachmentOffset.x *= attachmentScale;
-    scaledAttachmentOffset.y *= attachmentScale;
-    scaledAttachmentOffset.z *= attachmentScale;
-
-
-    wow::C3Vector vehiclePivot;
-    bool hasVehiclePivot = onVehicleSeatRecUpdate(vse, model, vehiclePivot);
-    if (hasVehiclePivot) {
-        float v29 = (((modelTransform[1].x * vehiclePivot.y) + (modelTransform[2].x * vehiclePivot.z))
-            + (modelTransform[0].x * vehiclePivot.x))
-            + modelTransform[3].x;
-        float v30 = (((modelTransform[0].y * vehiclePivot.x) + (modelTransform[1].y * vehiclePivot.y))
-            + (modelTransform[2].y * vehiclePivot.z))
-            + modelTransform[3].y;
-        scaledAttachmentOffset.z = ((((modelTransform[0].z * vehiclePivot.x) + (modelTransform[1].z * vehiclePivot.y))
-            + (modelTransform[2].z * vehiclePivot.z))
-            + modelTransform[3].z)
-            + scaledAttachmentOffset.z;
-        scaledAttachmentOffset.x += v29;
-        scaledAttachmentOffset.y += v30;
-    }
-
-    // Last step applies animation and world position
-    // Pray to god we don't need it
-    modelTransform[3].x = scaledAttachmentOffset.x;
-    modelTransform[3].y = scaledAttachmentOffset.y;
-    modelTransform[3].z = scaledAttachmentOffset.z;
-}
-
-wow::C3Vector computeSeatPos(wow::m2 const& model, datastores::VehicleSeatEntry const& vse) {
-    wow::C3Vector seatPosition;
-
-    wow::C3Vector vehiclePivot;
-    bool hasVehiclePivot = onVehicleSeatRecUpdate(vse, model, vehiclePivot);
-
-    auto attachmentID = vse.AttachmentID;
-    if (attachmentID > 26) {
-        // The game applies the vehicle's placement matrix but for our purpose that's just the identity matrix
-        return vse.AttachmentOffset;
-    } else {
-        attachmentID = g_vehicleGeoComponentsLinks[attachmentID];
-
-        wow::C44Matrix modelTransform;
-
-        if (hasVehiclePivot) {
-            make_identity(modelTransform);
-
-            computeModelTransform(modelTransform, model, vse, attachmentID, 0.0f /* ? ? ? */);
-            seatPosition.x = modelTransform.columns[3].x;
-            seatPosition.y = modelTransform.columns[3].y;
-            seatPosition.z = modelTransform.columns[3].z;
+        if (attachmentIndice == -1 ) {
+            return boneTransformationMatrices[0].value();
         }
         else {
-            memcpy(&seatPosition, &vse.AttachmentOffset, sizeof(wow::C3Vector));
+            auto result = getBoneMatrix(bone);
+            if (!result)
+                throw std::runtime_error("oof");
+            ::translate(result.value(), attachments[attachmentIndice].position);
+            return result.value();
+        }
+    }
+
+    void animate() {
+        auto boneIndices = (model << model.header()->boneIndicesById);
+        auto bones = (model << model.header()->bones);
+
+        for (uint32_t i = 0; i < bones.size(); ++i) {
+            calculateBoneMatrix(bones[i], i);
+        }
+    }
+
+    matref& getBoneMatrix(uint32_t boneIndice) {
+        return boneTransformationMatrices[boneIndice];
+    }
+
+    wow::C44Matrix calculateBoneMatrix(wow::M2CompBone const& bone, uint32_t boneIndice) {
+        if (boneTransformationMatrices[boneIndice])
+            return boneTransformationMatrices[boneIndice].value();
+
+        auto bones = (model << model.header()->bones);
+
+        wow::C44Matrix boneMat;
+        make_identity(boneMat);
+
+        wow::C44Matrix parentBoneMatrix;
+        make_identity(parentBoneMatrix);
+        if (bone.parent_bone >= 0) {
+            parentBoneMatrix = calculateBoneMatrix(bones[bone.parent_bone], bone.parent_bone);
+            wow::C44Matrix modifiedParentBoneMatrix = parentBoneMatrix;
+
+            if (bone.flags & 0x7) {
+                if ((bone.flags & 04) && (bone.flags & 0x02)) {
+
+                }
+                else if (bone.flags & 0x04) {
+
+                }
+                else if (bone.flags & 0x02) {
+
+                }
+
+                if (bone.flags & 0x01) {
+
+                }
+                else {
+                    auto pivot1 = wow::C4Vector(bone.pivot, 1.0f);
+                    auto negPivot0 = wow::C4Vector(bone.pivot.neg(), 0.0f);
+
+                    modifiedParentBoneMatrix[3] = (parentBoneMatrix * pivot1) - (modifiedParentBoneMatrix * negPivot0);
+                    modifiedParentBoneMatrix[3].o = 1.0f;
+                }
+
+                parentBoneMatrix = modifiedParentBoneMatrix;
+            }
         }
 
-        wow::C44Matrix attachmentWorldTransform;
-        if (getAttachmentWorldTransform(model, modelTransform, attachmentID)) {
-            float v18 = seatPosition.z * attachmentWorldTransform[2].y
-                + seatPosition.y * attachmentWorldTransform[1].y
-                + seatPosition.x * attachmentWorldTransform[0].y
-                + attachmentWorldTransform[3].y;
-            float v19 = seatPosition.z * attachmentWorldTransform[2].z
-                + seatPosition.y * attachmentWorldTransform[1].z
-                + seatPosition.x * attachmentWorldTransform[0].z
-                + attachmentWorldTransform[3].z;
-            seatPosition.x = seatPosition.z * attachmentWorldTransform[0].x
-                + seatPosition.z * attachmentWorldTransform[2].x
-                + seatPosition.y * attachmentWorldTransform[1].x
-                + attachmentWorldTransform[3].x;
-            seatPosition.y = v18;
-            seatPosition.z = v19;
+        auto pivot = wow::C4Vector(bone.pivot, 0.0f);
+        auto negPivot = wow::C4Vector(bone.pivot.neg(), 0.0f);
+
+        bool isAnimated = (bone.flags & 0x280);
+        bool isBillboarded = (bone.flags & 0x78);
+
+        if (isAnimated) {
+            // calcAnimationTransform - whatever
+            wow::C44Matrix animationTransform;
+            make_identity(animationTransform);
+
+            boneMat = parentBoneMatrix * animationTransform;
+        }
+        else {
+            boneMat = parentBoneMatrix;
+        }
+
+        if (isBillboarded) {
+            wow::C3Vector scale(boneMat[0].length(), boneMat[1].length(), boneMat[2].length());
+            auto boneMatCopy = boneMat;
+
+            if (bone.flags & 0x10) {
+                // y axis billboard
+            } else if (bone.flags & 0x20) {
+                // x axis billboard
+            } else if (bone.flags & 0x40) {
+                // another axis billboard
+            } else if (bone.flags & 0x08) {
+                if (isAnimated) {
+                    // billboard everything??
+                }
+                else {
+                    boneMat[0] = wow::C4Vector(0.0f, 0.0f, -1.0f, 0.0f);
+                    boneMat[1] = wow::C4Vector(1.0f, 0.0f,  0.0f, 0.0f);
+                    boneMat[2] = wow::C4Vector(0.0f, 1.0f,  0.0f, 0.0f);
+                }
+            }
+            wow::C4Vector pivot1(bone.pivot, 1.0f);
+            wow::C4Vector pivot0(bone.pivot, 0.0f);
+
+            boneMat[0] *= scale.x;
+            boneMat[1] *= scale.y;
+            boneMat[2] *= scale.z;
+            boneMat[3] = (boneMatCopy * pivot1) - (boneMat * pivot0);
+            boneMat[3].o = 0.0f;
+        }
+
+        boneTransformationMatrices[boneIndice] = matref(boneMat);
+        return boneMat;
+    }
+
+    wow::C3Vector computeSeatPosition(datastores::VehicleSeatEntry const& vse) {
+        wow::C3Vector seatPosition;
+
+        if (!(m_flags & 0x20))
+            onVehicleSeatRecUpdate(vse);
+
+        auto attachmentID = -1;
+        if (vse.AttachmentID < 26)
+            attachmentID = g_vehicleGeoComponentsLinks[vse.AttachmentID];
+
+        if (m_flags & 0x20 && m_flags & 0x40) {
+            wow::C44Matrix modelTransform = computeModelTransform(vse, attachmentID);
+            memcpy(&seatPosition, &modelTransform[3], sizeof(wow::C3Vector));
+        }
+        else {
+            seatPosition = vse.AttachmentOffset;
+        }
+
+        wow::C44Matrix modelTransform; make_identity(modelTransform);
+        if (hasAttachment(model, attachmentID)) {
+            wow::C44Matrix modelTransform = getAttachmentWorldTransform(attachmentID);
+
+            { // Translation
+                float v18 = (float)((float)((float)(seatPosition.z * modelTransform[2].y)
+                    + (float)(seatPosition.y * modelTransform[1].y))
+                    + (float)(seatPosition.x * modelTransform[0].y))
+                    + modelTransform[3].y;
+                float v19 = (float)((float)((float)(seatPosition.z * modelTransform[2].z)
+                    + (float)(seatPosition.y * modelTransform[1].z))
+                    + (float)(seatPosition.x * modelTransform[0].z))
+                    + modelTransform[3].z;
+                seatPosition.x = (float)((float)((float)(seatPosition.x * modelTransform[0].x)
+                    + (float)(seatPosition.z * modelTransform[2].x))
+                    + (float)(seatPosition.y * modelTransform[1].x))
+                    + modelTransform[3].x;
+                seatPosition.y = v18;
+                seatPosition.z = v19;
+            }
+
+            sub_57D110(&modelTransform);
+            float trueScale = getTrueScale(); // unit->getTrueScale()
+            if (modelTransform[2].z <= 1.0f) {
+                seatPosition.x -= modelTransform[3].x;
+                seatPosition.y -= modelTransform[3].y;
+                seatPosition.z -= modelTransform[3].z;
+            }
+            else {
+                throw std::runtime_error("not implemented");
+            }
+
+            wow::C44Matrix v42 = buildSmoothMatrix(); // unit->buildSmoothMatrix()
+            ::scale(v42, trueScale);
+
+            if (modelTransform[2].z <= 1.0f) {
+                seatPosition.x += v42[3].x;
+                seatPosition.y += v42[3].y;
+                seatPosition.z += v42[3].z;
+            }
+            else {
+                float v30 = seatPosition.x;
+                float v31 = (float)((float)((float)(seatPosition.z * v42[2].y)
+                    + (float)(seatPosition.y * v42[1].y))
+                    + (float)(v30 * v42[0].y))
+                    + v42[3].y;
+                float v32 = (float)((float)((float)(seatPosition.z * v42[2].z)
+                    + (float)(seatPosition.y * v42[1].z))
+                    + (float)(v30 * v42[0].z))
+                    + v42[3].z;
+                seatPosition.x = (float)((float)((float)(v30 * v42[0].x)
+                    + (float)(seatPosition.z * v42[2].x))
+                    + (float)(seatPosition.y * v42[1].x))
+                    + v42[3].x;
+                seatPosition.y = v31;
+                seatPosition.z = v32;
+            }
+        }
+        else {
+            wow::C44Matrix v35; make_identity(v35);
+            float v36 = seatPosition.y;
+            float v37 = seatPosition.z;
+            float v38 = (float)((float)((float)(v35[0].y * seatPosition.x) + (float)(v35[1].y * v36))
+                + (float)(v35[2].y * v37))
+                + v35[3].y;
+            float v39 = (float)((float)((float)(v35[1].x * v36) + (float)(v35[2].x * v37))
+                + (float)(seatPosition.x * v35[0].x))
+                + v35[3].x;
+            seatPosition.z = (float)((float)((float)(v35[0].z * seatPosition.x)
+                + (float)(v35[1].z * v36))
+                + (float)(v35[2].z * v37))
+                + v35[3].z;
+            seatPosition.y = v38;
+            seatPosition.x = v39;
         }
 
         return seatPosition;
     }
-}
+
+    void sub_57D110(wow::C44Matrix* modelTransform) {
+        animate();
+        // operator*(modelTransform, &model->m_positionMatrix, (C44Matrix *)(this->m_scene + 296));
+        make_identity(*modelTransform);
+    }
+
+    wow::C44Matrix buildSmoothMatrix() {
+        // get rotation, scale, translation
+        // for us this is identity
+        wow::C44Matrix mtx;
+        make_identity(mtx);
+        return mtx;
+    }
+
+    float getTrueScale() {
+        return cmd.ModelScale * cdi.ModelScale;
+    }
+
+    wow::C44Matrix computeModelTransform(datastores::VehicleSeatEntry const& vse, uint32_t attachmentID) {
+        wow::C44Matrix modelTransform;
+        make_identity(modelTransform);
+
+        float scale = getTrueScale();
+        if (hasAttachment(model, attachmentID)) {
+            auto attachmentWorldTransform = getAttachmentWorldTransform(attachmentID);
+
+            scale = attachmentWorldTransform[0].length();
+            if (scale > 0.0f)
+                scale = getTrueScale() / scale;
+
+            ::scale(attachmentWorldTransform, scale);
+            scale = 1.0f;
+        }
+        else {
+            ::scale(modelTransform, scale);
+        }
+
+        wow::C3Vector scaledAttchOfs(vse.AttachmentOffset);
+        scaledAttchOfs.x *= scale;
+        scaledAttchOfs.y *= scale;
+        scaledAttchOfs.z *= scale;
+
+        if (this->m_flags & 0x20 && m_flags & 0x40) {
+            float v26 = this->negatedPivot.y;
+            float v27 = this->negatedPivot.z;
+            float v28 = this->negatedPivot.x;
+            float v29 = (float)((float)((float)(modelTransform[1].x * v26) + (float)(modelTransform[2].x * v27))
+                + (float)(modelTransform[0].x * v28))
+                + modelTransform[3].x;
+            float v30 = (float)((float)((float)(modelTransform[0].y * v28) + (float)(modelTransform[1].y * v26))
+                + (float)(modelTransform[2].y * v27))
+                + modelTransform[3].y;
+            scaledAttchOfs.z += (float)((float)((float)((float)(modelTransform[0].z * v28)
+                + (float)(modelTransform[1].z * v26))
+                + (float)(modelTransform[2].z * v27))
+                + modelTransform[3].z);
+            scaledAttchOfs.x += v29;
+            scaledAttchOfs.y += v30;
+        }
+
+        modelTransform[3] = wow::C4Vector(scaledAttchOfs, modelTransform[3].o);
+
+        if (!hasAttachment(model, attachmentID)) {
+            // not a code path for this isue...
+        }
+
+        return modelTransform;
+    }
+
+    void onVehicleSeatRecUpdate(datastores::VehicleSeatEntry const& vse) {
+        if (hasAttachment(model, vse.Passenger.AttachmentID)) {
+            negatedPivot = getAttachmentPivot(model, vse.Passenger.AttachmentID).value();
+            negatedPivot.x *= -1.0f;
+            negatedPivot.y *= -1.0f;
+            negatedPivot.z *= -1.0f;
+            m_flags |= 0x40 | 0x20;
+        }
+        else {
+            negatedPivot.x = 0.0f;
+            negatedPivot.y = 0.0f;
+            negatedPivot.z = 0.0f;
+            m_flags = (m_flags & ~0x40) | 0x20;
+        }
+    }
+
+    uint32_t m_flags;
+    wow::m2 const& model;
+    datastores::CreatureModelDataEntry const& cmd;
+    datastores::CreatureDisplayInfoEntry const& cdi;
+    wow::C3Vector negatedPivot;
+
+    std::unordered_map<uint32_t /* boneIndice */, matref> boneTransformationMatrices;
+};
+
 
 int main(int argc, char* argv[]) {
     using namespace datastores;
@@ -259,10 +494,11 @@ int main(int argc, char* argv[]) {
     auto vehicleSeat = open_dbc<VehicleSeatEntry>(fs);
     auto vehicle = open_dbc<VehicleEntry>(fs);
 
-    db::mysql db("localhost", 3306, "root", "root", "world");
-    auto result = db.select("SELECT `entry`, `modelid1`, `modelid2`, `modelid3`, `modelid4`, `name`, `VehicleID` FROM `creature_template` WHERE `VehicleID` <> 0");
+    db::mysql db("localhost", 3306, "root", "toor", "tc_world");
+    auto result = db.select("SELECT `entry`, `modelid1`, `modelid2`, `modelid3`, `modelid4`, `name`, `VehicleID` FROM `creature_template` WHERE `VehicleID` <> 0 AND `entry`=36619");
 
-    while (result) {
+    while (result)
+    {
         uint32_t entry;
         std::array<uint32_t, 4> modelIDs;
         std::string creatureName;
@@ -271,7 +507,38 @@ int main(int argc, char* argv[]) {
         result >> entry >> modelIDs >> creatureName >> vehicleID;
 
         VehicleEntry const& vehicleEntry = vehicle[vehicleID];
-        std::cout << "Creature #" << entry << " (" << creatureName << ") uses Vehicle #" << vehicleID << std::endl;
+        std::cout << "-- Creature " << entry << " (" << creatureName << ") uses Vehicle #" << vehicleID << std::endl;
+
+        for (auto&& seatID : vehicleEntry.SeatID) {
+            if (seatID == 0)
+                continue;
+
+            VehicleSeatEntry const& vse = vehicleSeat[seatID];
+            for (auto modelID : modelIDs) {
+                if (modelID == 0)
+                    continue;
+
+                CreatureDisplayInfoEntry const& cdi = creatureDisplayInfo[modelID];
+                CreatureModelDataEntry const& cmd = creatureModelData[cdi.ModelID];
+                if (cmd.ModelName == nullptr || strlen(cmd.ModelName) == 0)
+                    continue;
+
+                std::string modelName = cmd.ModelName;
+                std::transform(modelName.begin(), modelName.end(), modelName.begin(), ::toupper);
+                replace(modelName, ".MDX", ".M2");
+                replace(modelName, ".MDL", ".M2");
+
+                wow::m2 model = open_m2(fs, modelName);
+                CVehiclePassenger_C passenger(model, cdi, cmd);
+                auto seatPosition = passenger.computeSeatPosition(vse);
+
+                std::cout << "(" << cmd.ID
+                    << ", " << vse.ID
+                    << ", " << seatPosition.x << ", " << seatPosition.y << ", " << seatPosition.z
+                    << "), -- " << modelName
+                    << std::endl;
+            }
+        }
 
         ++result;
     }

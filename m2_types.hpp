@@ -50,6 +50,9 @@ namespace wow {
         float y;
         float z;
 
+        constexpr C3Vector(float x, float y, float z) : x(x), y(y), z(z) { }
+        constexpr C3Vector() : x(0.0f), y(0.0f), z(0.0f) { }
+
         float length() const {
             return std::sqrt(lengthSquared());
         }
@@ -57,14 +60,87 @@ namespace wow {
         float lengthSquared() const {
             return x * x + y * y + z * z;
         }
+
+        inline C3Vector& operator -= (C3Vector const& v) {
+            x -= v.x;
+            y -= v.y;
+            z -= v.z;
+            return *this;
+        }
+
+        inline C3Vector neg() const {
+            C3Vector v(*this);
+            v.x *= -1.0f;
+            v.y *= -1.0f;
+            v.z *= -1.0f;
+            return v;
+        }
     };
+
+    inline C3Vector operator - (C3Vector const& l, C3Vector const& r) {
+        C3Vector o = l;
+        o -= r;
+        return o;
+    }
 
     struct C4Vector {
         float x;
         float y;
         float z;
         float o;
+
+        constexpr C4Vector() : x(0.0f), y(0.0f), z(0.0f), o(0.0f) { }
+        constexpr C4Vector(float x, float y, float z, float w) : x(x), y(y), z(z), o(w) { }
+
+        C4Vector(C3Vector const& v, float o) {
+            memcpy(&x, &v, sizeof(C3Vector));
+            this->o = o;
+        }
+
+        float& operator[] (size_t index) {
+            float* flt = &x + index;
+            return *flt;
+        }
+
+        float const& operator[] (size_t index) const {
+            float const* flt = &x + index;
+            return *flt;
+        }
+
+        float length() const {
+            return std::sqrt(lengthSquared());
+        }
+
+        float lengthSquared() const {
+            return x * x + y * y + z * z + o * o;
+        }
+
+        inline operator C3Vector() {
+            return C3Vector{ x, y, z };
+        }
+
+        inline C4Vector& operator *= (float s) {
+            x *= s;
+            y *= s;
+            z *= s;
+            o *= s;
+            return *this;
+        }
+
+        inline C4Vector& operator -= (C4Vector const& v) {
+            x -= v.x;
+            y -= v.y;
+            z -= v.z;
+            o -= v.o;
+            return *this;
+        }
     };
+
+    inline C4Vector operator - (C4Vector const& l, C4Vector const& r) {
+        C4Vector o = l;
+        o -= r;
+        return o;
+    }
 
     struct C44Matrix {
         C4Vector columns[4];
@@ -74,6 +150,48 @@ namespace wow {
         }
 
         C4Vector const& operator[] (size_t sz) const {
+            return columns[sz];
+        }
+    };
+
+
+    inline C44Matrix operator * (C44Matrix const& left, C44Matrix const& right) {
+        C44Matrix result;
+        for (int y = 0; y < 4; ++y) {
+            for (int x = 0; x < 4; ++x) {
+                float accum = 0.0f;
+
+                for (int k = 0; k < 4; ++k)
+                    accum += left[k][y] * right[x][k];
+
+                result[y][x] = accum;
+            }
+        }
+        return result;
+    }
+    
+    inline C4Vector operator * (C44Matrix const& left, C4Vector const& right) {
+        C4Vector result;
+        for (size_t rowIndex = 0; rowIndex < 4; ++rowIndex) {
+            float accum = 0.0f;
+
+            for (size_t k = 0; k < 4; ++k)
+                accum += left[k][rowIndex] * right[rowIndex];
+
+            result[rowIndex] = accum;
+        }
+        return result;
+    }
+
+
+    struct C33Matrix {
+        C3Vector columns[3];
+
+        C3Vector& operator[] (size_t sz) {
+            return columns[sz];
+        }
+
+        C3Vector const& operator[] (size_t sz) const {
             return columns[sz];
         }
     };
@@ -215,7 +333,7 @@ namespace wow {
 
     struct M2Attachment {
         uint32_t id;                        // Referenced in the lookup-block below.
-        uint16_t bone;                      // attachment base
+        int16_t bone;                      // attachment base
         uint16_t unknown;                   // see BogBeast.m2 in vanilla for a model having values here
         C3Vector position;                  // relative to bone; Often this value is the same as bone's pivot point 
         M2Track<uint8_t> animate_attached;  // whether or not the attached model is animated when this model is. only a bool is used. default is true.
