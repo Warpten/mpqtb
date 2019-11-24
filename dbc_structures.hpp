@@ -1033,8 +1033,10 @@ namespace datastores
     struct VehicleSeatEntry {
         uint32_t ID;
         uint32_t Flags;
-        uint32_t AttachmentID;
-        wow::C3Vector AttachmentOffset;
+        struct {
+            uint32_t ID;
+            wow::C3Vector Offset;
+        } Attachment;
         struct {
             float PreDelay;
             float Speed;
@@ -1071,7 +1073,7 @@ namespace datastores
             float Yaw;
             float Pitch;
             float Roll;
-            uint32_t AttachmentID;
+            int32_t AttachmentID;
         } Passenger;
         struct {
             uint32_t EnterAnim;

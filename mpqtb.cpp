@@ -11,6 +11,7 @@
 #include <algorithm>
 #include <string_view>
 #include <iostream>
+#include <iomanip>
 #include <set>
 
 std::string_view get_argument(std::vector<const char*> const& args, std::string_view key) {
@@ -51,11 +52,11 @@ constexpr static const uint32_t g_vehicleGeoComponentsLinks[] = {
 };
 
 
-bool hasAttachment(wow::m2 const& model, uint32_t attachmentId) {
+bool hasAttachment(wow::m2 const& model, int32_t attachmentId) {
     auto attachmentIndicesById = (model << model.header()->attachmentIndicesById);
     auto attachments = (model << model.header()->attachments);
 
-    if (attachmentId < attachmentIndicesById.size())
+    if (attachmentId >= 0 && attachmentId < attachmentIndicesById.size())
         return attachmentIndicesById[attachmentId] < attachments.size();
 
     return attachments.size() > 0xFFFF;
@@ -75,51 +76,6 @@ std::optional<wow::C3Vector> getAttachmentPivot(wow::m2 const& model, uint32_t a
         return std::nullopt;
 
     return attachments[attachmentIndice].position;
-}
-
-void make_identity(wow::C44Matrix& m) {
-    m.columns[0].x = 1.0f;       // identity matrix
-    m.columns[0].y = 0.0f;
-    m.columns[0].z = 0.0f;
-    m.columns[0].o = 0.0f;
-    m.columns[1].x = 0.0f;
-    m.columns[1].y = 1.0f;
-    m.columns[1].z = 0.0f;
-    m.columns[1].o = 0.0f;
-    m.columns[2].x = 0.0f;
-    m.columns[2].y = 0.0f;
-    m.columns[2].z = 1.0f;
-    m.columns[2].o = 0.0f;
-    m.columns[3].x = 0.0f;
-    m.columns[3].y = 0.0f;
-    m.columns[3].z = 0.0f;
-    m.columns[3].o = 1.0f;
-}
-
-void translate(wow::C44Matrix& m, wow::C3Vector const& v) {
-    float v3; // xmm1_4
-    float v4; // xmm0_4
-    float v5; // xmm1_4
-
-    v3 = m[1].y;
-    m[3].x = (((m[2].x * v.z) + (m[1].x * v.y)) + (v.x * m[0].x)) + m[3].x;
-    v4 = (((m[2].y * v.z) + (v3 * v.y)) + (m[0].y * v.x)) + m[3].y;
-    v5 = m[1].z;
-    m[3].y = v4;
-    m[3].z = (((m[2].z * v.z) + (v5 * v.y)) + (m[0].z * v.x)) + m[3].z;
-}
-
-void translate(wow::C44Matrix& m, wow::C4Vector const& v) { // UNVERIFIED
-    float v3; // xmm1_4
-    float v4; // xmm0_4
-    float v5; // xmm1_4
-
-    v3 = m[1].y;
-    m[3].x = (((m[2].x * v.z) + (m[1].x * v.y)) + (v.x * m[0].x)) + m[3].x * v.o;
-    v4 = (((m[2].y * v.z) + (v3 * v.y)) + (m[0].y * v.x)) + m[3].y * v.o;
-    v5 = m[1].z;
-    m[3].y = v4;
-    m[3].z = (((m[2].z * v.z) + (v5 * v.y)) + (m[0].z * v.x)) + m[3].z * v.o;
 }
 
 void scale(wow::C44Matrix& m, float s)
@@ -150,6 +106,10 @@ struct CVehiclePassenger_C
             return _mat;
         }
 
+        inline wow::C44Matrix* operator -> () {
+            return &_mat;
+        }
+
         inline wow::C44Matrix const& value() const { return _mat; }
         inline wow::C44Matrix& value() { return _mat; }
         inline operator bool() const { return _hasValue; }
@@ -172,27 +132,33 @@ struct CVehiclePassenger_C
         animate();
 
         if (attachmentIndice == -1 ) {
-            return boneTransformationMatrices[0].value();
+            return getBoneMatrix(0).value();
         }
         else {
             auto result = getBoneMatrix(bone);
             if (!result)
                 throw std::runtime_error("oof");
-            ::translate(result.value(), attachments[attachmentIndice].position);
+
+            result = result->translate(attachments[attachmentIndice].position * -1.0f);
             return result.value();
         }
     }
 
     void animate() {
-        auto boneIndices = (model << model.header()->boneIndicesById);
+        // Made a no-op to avoid calculating unneeded bone matrices
+        /*auto boneIndices = (model << model.header()->boneIndicesById);
         auto bones = (model << model.header()->bones);
 
         for (uint32_t i = 0; i < bones.size(); ++i) {
             calculateBoneMatrix(bones[i], i);
-        }
+        }*/
     }
 
     matref& getBoneMatrix(uint32_t boneIndice) {
+        if (!boneTransformationMatrices[boneIndice]) {
+            calculateBoneMatrix((model << model.header()->bones)[boneIndice], boneIndice);
+        }
+
         return boneTransformationMatrices[boneIndice];
     }
 
@@ -203,16 +169,14 @@ struct CVehiclePassenger_C
         auto bones = (model << model.header()->bones);
 
         wow::C44Matrix boneMat;
-        make_identity(boneMat);
 
         wow::C44Matrix parentBoneMatrix;
-        make_identity(parentBoneMatrix);
         if (bone.parent_bone >= 0) {
             parentBoneMatrix = calculateBoneMatrix(bones[bone.parent_bone], bone.parent_bone);
             wow::C44Matrix modifiedParentBoneMatrix = parentBoneMatrix;
 
             if (bone.flags & 0x7) {
-                if ((bone.flags & 04) && (bone.flags & 0x02)) {
+                if ((bone.flags & 0x04) && (bone.flags & 0x02)) {
 
                 }
                 else if (bone.flags & 0x04) {
@@ -221,7 +185,7 @@ struct CVehiclePassenger_C
                 else if (bone.flags & 0x02) {
 
                 }
-
+               
                 if (bone.flags & 0x01) {
 
                 }
@@ -244,10 +208,30 @@ struct CVehiclePassenger_C
         bool isBillboarded = (bone.flags & 0x78);
 
         if (isAnimated) {
-            // calcAnimationTransform - whatever
             wow::C44Matrix animationTransform;
-            make_identity(animationTransform);
+            { // calcAnimationTransform
+                animationTransform = animationTransform.translate(pivot);
 
+                auto translationTrack = bone.translation;
+                if (translationTrack.values.count > 0) {
+                    std::vector<wow::M2Array<wow::C3Vector>> translationValuesXSequence = (model << translationTrack.values);
+
+                    auto translations = (model << translationValuesXSequence.back());
+                    if (!translations.empty())
+                        animationTransform = animationTransform.translate(translations.back());
+                }
+
+                auto scaleTrack = bone.scale;
+                if (scaleTrack.values.count > 0) {
+                    std::vector<wow::M2Array<wow::C3Vector>> scaleValuesXSequence = (model << scaleTrack.values);
+
+                    auto scales = (model << scaleValuesXSequence.back());
+                    if (!scales.empty())
+                        animationTransform = animationTransform.scale(scales.back());
+                }
+
+                animationTransform = animationTransform.translate(negPivot);
+            }
             boneMat = parentBoneMatrix * animationTransform;
         }
         else {
@@ -255,33 +239,7 @@ struct CVehiclePassenger_C
         }
 
         if (isBillboarded) {
-            wow::C3Vector scale(boneMat[0].length(), boneMat[1].length(), boneMat[2].length());
-            auto boneMatCopy = boneMat;
-
-            if (bone.flags & 0x10) {
-                // y axis billboard
-            } else if (bone.flags & 0x20) {
-                // x axis billboard
-            } else if (bone.flags & 0x40) {
-                // another axis billboard
-            } else if (bone.flags & 0x08) {
-                if (isAnimated) {
-                    // billboard everything??
-                }
-                else {
-                    boneMat[0] = wow::C4Vector(0.0f, 0.0f, -1.0f, 0.0f);
-                    boneMat[1] = wow::C4Vector(1.0f, 0.0f,  0.0f, 0.0f);
-                    boneMat[2] = wow::C4Vector(0.0f, 1.0f,  0.0f, 0.0f);
-                }
-            }
-            wow::C4Vector pivot1(bone.pivot, 1.0f);
-            wow::C4Vector pivot0(bone.pivot, 0.0f);
-
-            boneMat[0] *= scale.x;
-            boneMat[1] *= scale.y;
-            boneMat[2] *= scale.z;
-            boneMat[3] = (boneMatCopy * pivot1) - (boneMat * pivot0);
-            boneMat[3].o = 0.0f;
+            throw std::runtime_error("billboard not implemented");
         }
 
         boneTransformationMatrices[boneIndice] = matref(boneMat);
@@ -289,46 +247,74 @@ struct CVehiclePassenger_C
     }
 
     wow::C3Vector computeSeatPosition(datastores::VehicleSeatEntry const& vse) {
-        wow::C3Vector seatPosition;
+        wow::C3Vector seatPosition(0.0f, 0.0f, 0.0f);
 
         if (!(m_flags & 0x20))
             onVehicleSeatRecUpdate(vse);
 
         auto attachmentID = -1;
-        if (vse.AttachmentID < 26)
-            attachmentID = g_vehicleGeoComponentsLinks[vse.AttachmentID];
+        if (vse.Attachment.ID < 26)
+            attachmentID = g_vehicleGeoComponentsLinks[vse.Attachment.ID];
 
         if (m_flags & 0x20 && m_flags & 0x40) {
             wow::C44Matrix modelTransform = computeModelTransform(vse, attachmentID);
             memcpy(&seatPosition, &modelTransform[3], sizeof(wow::C3Vector));
         }
         else {
-            seatPosition = vse.AttachmentOffset;
+            seatPosition = vse.Attachment.Offset;
+#if 1
+            // WHY ????
+            //seatPosition *= -1.0f;
+#endif
         }
 
-        wow::C44Matrix modelTransform; make_identity(modelTransform);
+        wow::C44Matrix modelTransform;
         if (hasAttachment(model, attachmentID)) {
             wow::C44Matrix modelTransform = getAttachmentWorldTransform(attachmentID);
+            
+            // This is definitely wrong but it works for a few models. Why?
+#if 0
+            wow::C44Matrix attachmentTranslationMatrix;
+            attachmentTranslationMatrix[3] = seatPosition;
+            attachmentTranslationMatrix[3].z *= -1;
+            attachmentTranslationMatrix[3] *= getTrueScale();
 
+            wow::C44Matrix finalMat = attachmentTranslationMatrix * modelTransform;
+            seatPosition = finalMat[3];
+#else
+            // translation
+            float v18 = (((seatPosition.z * modelTransform[2].y) + (seatPosition.y * modelTransform[1].y))
+                + (seatPosition.x * modelTransform[0].y))
+                + modelTransform[3].y;
+            float v19 = (((seatPosition.z * modelTransform[2].z) + (seatPosition.y * modelTransform[1].z))
+                + (seatPosition.x * modelTransform[0].z))
+                + modelTransform[3].z;
+            seatPosition.x = (((seatPosition.x * modelTransform[0].x)
+                + (seatPosition.z * modelTransform[2].x))
+                + (seatPosition.y * modelTransform[1].x))
+                + modelTransform[3].x;
+            seatPosition.y = v18;
+            seatPosition.z = v19;
+#endif
+            /*
             { // Translation
-                float v18 = (float)((float)((float)(seatPosition.z * modelTransform[2].y)
-                    + (float)(seatPosition.y * modelTransform[1].y))
-                    + (float)(seatPosition.x * modelTransform[0].y))
+                float v18 = seatPosition.z * modelTransform[2].y
+                    + seatPosition.y * modelTransform[1].y
+                    + seatPosition.x * modelTransform[0].y
                     + modelTransform[3].y;
-                float v19 = (float)((float)((float)(seatPosition.z * modelTransform[2].z)
-                    + (float)(seatPosition.y * modelTransform[1].z))
-                    + (float)(seatPosition.x * modelTransform[0].z))
+                float v19 = seatPosition.z * modelTransform[2].z
+                    + seatPosition.y * modelTransform[1].z
+                    + seatPosition.x * modelTransform[0].z
                     + modelTransform[3].z;
-                seatPosition.x = (float)((float)((float)(seatPosition.x * modelTransform[0].x)
-                    + (float)(seatPosition.z * modelTransform[2].x))
-                    + (float)(seatPosition.y * modelTransform[1].x))
+                seatPosition.x = seatPosition.x * modelTransform[0].x
+                    + seatPosition.z * modelTransform[2].x
+                    + seatPosition.y * modelTransform[1].x
                     + modelTransform[3].x;
                 seatPosition.y = v18;
                 seatPosition.z = v19;
-            }
+            }*/
 
-            sub_57D110(&modelTransform);
-            float trueScale = getTrueScale(); // unit->getTrueScale()
+            /*sub_57D110(&modelTransform);
             if (modelTransform[2].z <= 1.0f) {
                 seatPosition.x -= modelTransform[3].x;
                 seatPosition.y -= modelTransform[3].y;
@@ -342,9 +328,9 @@ struct CVehiclePassenger_C
             ::scale(v42, trueScale);
 
             if (modelTransform[2].z <= 1.0f) {
-                seatPosition.x += v42[3].x;
-                seatPosition.y += v42[3].y;
-                seatPosition.z += v42[3].z;
+                seatPosition.x = seatPosition.x - modelTransform[3].x + v42[3].x;
+                seatPosition.y = v42[3].y;
+                seatPosition.z = v42[3].z;
             }
             else {
                 float v30 = seatPosition.x;
@@ -362,10 +348,10 @@ struct CVehiclePassenger_C
                     + v42[3].x;
                 seatPosition.y = v31;
                 seatPosition.z = v32;
-            }
+            */
         }
         else {
-            wow::C44Matrix v35; make_identity(v35);
+            wow::C44Matrix v35;
             float v36 = seatPosition.y;
             float v37 = seatPosition.z;
             float v38 = (float)((float)((float)(v35[0].y * seatPosition.x) + (float)(v35[1].y * v36))
@@ -388,14 +374,12 @@ struct CVehiclePassenger_C
     void sub_57D110(wow::C44Matrix* modelTransform) {
         animate();
         // operator*(modelTransform, &model->m_positionMatrix, (C44Matrix *)(this->m_scene + 296));
-        make_identity(*modelTransform);
     }
 
     wow::C44Matrix buildSmoothMatrix() {
         // get rotation, scale, translation
         // for us this is identity
         wow::C44Matrix mtx;
-        make_identity(mtx);
         return mtx;
     }
 
@@ -405,7 +389,6 @@ struct CVehiclePassenger_C
 
     wow::C44Matrix computeModelTransform(datastores::VehicleSeatEntry const& vse, uint32_t attachmentID) {
         wow::C44Matrix modelTransform;
-        make_identity(modelTransform);
 
         float scale = getTrueScale();
         if (hasAttachment(model, attachmentID)) {
@@ -415,32 +398,31 @@ struct CVehiclePassenger_C
             if (scale > 0.0f)
                 scale = getTrueScale() / scale;
 
-            ::scale(attachmentWorldTransform, scale);
+            attachmentWorldTransform = attachmentWorldTransform.scale(scale);
             scale = 1.0f;
         }
         else {
-            ::scale(modelTransform, scale);
+            modelTransform = modelTransform.scale(scale);
         }
 
-        wow::C3Vector scaledAttchOfs(vse.AttachmentOffset);
+        wow::C3Vector scaledAttchOfs(vse.Attachment.Offset);
         scaledAttchOfs.x *= scale;
         scaledAttchOfs.y *= scale;
         scaledAttchOfs.z *= scale;
 
         if (this->m_flags & 0x20 && m_flags & 0x40) {
-            float v26 = this->negatedPivot.y;
-            float v27 = this->negatedPivot.z;
-            float v28 = this->negatedPivot.x;
-            float v29 = (float)((float)((float)(modelTransform[1].x * v26) + (float)(modelTransform[2].x * v27))
-                + (float)(modelTransform[0].x * v28))
+            float v29 = modelTransform[1].x * negatedPivot.y
+                + modelTransform[2].x * negatedPivot.z
+                + modelTransform[0].x * negatedPivot.x
                 + modelTransform[3].x;
-            float v30 = (float)((float)((float)(modelTransform[0].y * v28) + (float)(modelTransform[1].y * v26))
-                + (float)(modelTransform[2].y * v27))
+            float v30 = modelTransform[0].y * negatedPivot.x
+                + modelTransform[1].y * negatedPivot.y
+                + modelTransform[2].y * negatedPivot.z
                 + modelTransform[3].y;
-            scaledAttchOfs.z += (float)((float)((float)((float)(modelTransform[0].z * v28)
-                + (float)(modelTransform[1].z * v26))
-                + (float)(modelTransform[2].z * v27))
-                + modelTransform[3].z);
+            scaledAttchOfs.z += modelTransform[0].z * negatedPivot.x
+                + modelTransform[1].z * negatedPivot.y
+                + modelTransform[2].z * negatedPivot.z
+                + modelTransform[3].z;
             scaledAttchOfs.x += v29;
             scaledAttchOfs.y += v30;
         }
@@ -448,7 +430,7 @@ struct CVehiclePassenger_C
         modelTransform[3] = wow::C4Vector(scaledAttchOfs, modelTransform[3].o);
 
         if (!hasAttachment(model, attachmentID)) {
-            // not a code path for this isue...
+            throw std::runtime_error("attachment not found on model, cannot continue");
         }
 
         return modelTransform;
@@ -456,10 +438,7 @@ struct CVehiclePassenger_C
 
     void onVehicleSeatRecUpdate(datastores::VehicleSeatEntry const& vse) {
         if (hasAttachment(model, vse.Passenger.AttachmentID)) {
-            negatedPivot = getAttachmentPivot(model, vse.Passenger.AttachmentID).value();
-            negatedPivot.x *= -1.0f;
-            negatedPivot.y *= -1.0f;
-            negatedPivot.z *= -1.0f;
+            negatedPivot = getAttachmentPivot(model, vse.Passenger.AttachmentID).value() * -1.0f;
             m_flags |= 0x40 | 0x20;
         }
         else {
@@ -470,7 +449,9 @@ struct CVehiclePassenger_C
         }
     }
 
-    uint32_t m_flags;
+    uint32_t flags() const { return m_flags; }
+
+    uint32_t m_flags = 0;
     wow::m2 const& model;
     datastores::CreatureModelDataEntry const& cmd;
     datastores::CreatureDisplayInfoEntry const& cdi;
@@ -495,7 +476,13 @@ int main(int argc, char* argv[]) {
     auto vehicle = open_dbc<VehicleEntry>(fs);
 
     db::mysql db("localhost", 3306, "root", "toor", "tc_world");
-    auto result = db.select("SELECT `entry`, `modelid1`, `modelid2`, `modelid3`, `modelid4`, `name`, `VehicleID` FROM `creature_template` WHERE `VehicleID` <> 0 AND `entry`=36619");
+    // 36619 - Bone spike, (-0.02206125 -0.02132235 5.514783)
+    // 56168 - Wing Tentacle
+    // 27755 - Amber Drake (0.590625 0.0048 2.09835)
+    // 36557 - Argent Warhorse (0.213069 0 1.86572)
+    // 33323 - Silvermoon Hawkstrider (-0.383392 0 2.308809)
+    auto result = db.select("SELECT `entry`, `modelid1`, `modelid2`, `modelid3`, `modelid4`, `name`, `VehicleID` "
+        "FROM `creature_template` WHERE `VehicleID` <> 0 AND entry IN (36619)");
 
     while (result)
     {
@@ -534,7 +521,7 @@ int main(int argc, char* argv[]) {
 
                 std::cout << "(" << cmd.ID
                     << ", " << vse.ID
-                    << ", " << seatPosition.x << ", " << seatPosition.y << ", " << seatPosition.z
+                    << ", " << std::setprecision(8) << seatPosition.x << ", " << seatPosition.y << ", " << seatPosition.z
                     << "), -- " << modelName
                     << std::endl;
             }

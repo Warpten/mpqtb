@@ -1,5 +1,8 @@
 #pragma once
 
+#ifndef M2TYPES_H_
+#define M2TYPES_H_
+
 #include <cstdint>
 #include <vector>
 #include <stdexcept>
@@ -46,12 +49,18 @@ namespace wow {
     };
 
     struct C3Vector {
-        float x;
-        float y;
-        float z;
+        union {
+            struct {
+                float x;
+                float y;
+                float z;
+            };
+            float raw[3];
+        };
 
         constexpr C3Vector(float x, float y, float z) : x(x), y(y), z(z) { }
         constexpr C3Vector() : x(0.0f), y(0.0f), z(0.0f) { }
+        constexpr explicit C3Vector(float v) : C3Vector(v, v, v) { }
 
         float length() const {
             return std::sqrt(lengthSquared());
@@ -68,6 +77,13 @@ namespace wow {
             return *this;
         }
 
+        inline C3Vector& operator *= (float f) {
+            x *= f;
+            y *= f;
+            z *= f;
+            return *this;
+        }
+
         inline C3Vector neg() const {
             C3Vector v(*this);
             v.x *= -1.0f;
@@ -75,11 +91,25 @@ namespace wow {
             v.z *= -1.0f;
             return v;
         }
+
+        float const& operator[] (size_t idx) const {
+            return raw[idx];
+        }
+
+        float& operator[] (size_t index) {
+            return raw[index];
+        }
     };
 
     inline C3Vector operator - (C3Vector const& l, C3Vector const& r) {
-        C3Vector o = l;
+        C3Vector o(l);
         o -= r;
+        return o;
+    }
+
+    inline C3Vector operator * (C3Vector const& l, float r) {
+        C3Vector o(l);
+        o *= r;
         return o;
     }
 
@@ -134,6 +164,12 @@ namespace wow {
             o -= v.o;
             return *this;
         }
+
+        inline C4Vector& operator = (C3Vector const& v) {
+            memcpy(&x, &v.x, sizeof(C3Vector));
+            o = 1.0f;
+            return *this;
+        }
     };
 
     inline C4Vector operator - (C4Vector const& l, C4Vector const& r) {
@@ -142,8 +178,22 @@ namespace wow {
         return o;
     }
 
+    struct C44Matrix;
+    inline C44Matrix operator * (C44Matrix const& left, C44Matrix const& right);
+
     struct C44Matrix {
-        C4Vector columns[4];
+        union {
+            C4Vector columns[4];
+            float raw[4 * 4];
+        };
+
+        C44Matrix() {
+            memset(raw, 0, sizeof(raw));
+            raw[0] = 1.0f;
+            raw[5] = 1.0f;
+            raw[10] = 1.0f;
+            raw[15] = 1.0f;
+        }
 
         C4Vector& operator[] (size_t sz) {
             return columns[sz];
@@ -151,6 +201,39 @@ namespace wow {
 
         C4Vector const& operator[] (size_t sz) const {
             return columns[sz];
+        }
+
+        C44Matrix translate(wow::C3Vector const& v) {
+            float v3; // xmm1_4
+            float v4; // xmm0_4
+            float v5; // xmm1_4
+
+            C44Matrix m(*this);
+
+            v3 = m[1].y;
+            m[3].x = (((m[2].x * v.z) + (m[1].x * v.y)) + (v.x * m[0].x)) + m[3].x;
+            v4 = (((m[2].y * v.z) + (v3 * v.y)) + (m[0].y * v.x)) + m[3].y;
+            v5 = m[1].z;
+            m[3].y = v4;
+            m[3].z = (((m[2].z * v.z) + (v5 * v.y)) + (m[0].z * v.x)) + m[3].z;
+            return m;
+        }
+
+        C44Matrix scale(float f) {
+            return scale(C3Vector{ f, f, f });
+        }
+
+        C44Matrix scale(C3Vector const& v) {
+            C44Matrix scale;
+            C44Matrix m(*this);
+
+            {
+                for (int i = 0; i < 3; ++i)
+                    scale[i][i] = v[i];
+            }
+            scale[3][3] = 1.0f;
+
+            return m * scale;
         }
     };
 
@@ -164,7 +247,7 @@ namespace wow {
                 for (int k = 0; k < 4; ++k)
                     accum += left[k][y] * right[x][k];
 
-                result[y][x] = accum;
+                result[x][y] = accum;
             }
         }
         return result;
@@ -458,3 +541,5 @@ namespace wow {
         uint16_t _;
     };
 }
+
+#endif // M2TYPES_H_

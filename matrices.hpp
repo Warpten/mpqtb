@@ -69,6 +69,9 @@ namespace geo {
         }
     }
 
-    using C33Matrix = Matrix<C3Vector>;
-    using C44Matrix = Matrix<C4Vector>;
+    template <typename T>
+    using C33Matrix = Matrix<C3Vector<T>>;
+    
+    template <typename T>
+    using C44Matrix = Matrix<C4Vector<T>>;
 }
