@@ -139,7 +139,7 @@ struct CVehiclePassenger_C
             if (!result)
                 throw std::runtime_error("oof");
 
-            result = result->translate(attachments[attachmentIndice].position * -1.0f);
+            result = result->translate(attachments[attachmentIndice].position);
             return result.value();
         }
     }
@@ -264,7 +264,7 @@ struct CVehiclePassenger_C
             seatPosition = vse.Attachment.Offset;
 #if 1
             // WHY ????
-            //seatPosition *= -1.0f;
+            seatPosition *= -1.0f;
 #endif
         }
 
@@ -395,7 +395,7 @@ struct CVehiclePassenger_C
             auto attachmentWorldTransform = getAttachmentWorldTransform(attachmentID);
 
             scale = attachmentWorldTransform[0].length();
-            if (scale > 0.0f)
+            if (scale > 0.000099999997f)
                 scale = getTrueScale() / scale;
 
             attachmentWorldTransform = attachmentWorldTransform.scale(scale);
@@ -403,6 +403,7 @@ struct CVehiclePassenger_C
         }
         else {
             modelTransform = modelTransform.scale(scale);
+            scale = 1.0f; // Passenger scale. FIXME
         }
 
         wow::C3Vector scaledAttchOfs(vse.Attachment.Offset);

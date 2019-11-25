@@ -119,7 +119,7 @@ namespace geo {
             T x_ = y * o.z - o.y * z;
             T y_ = z * o.x - o.z * x;
             T z_ = x * o.y - o.x * y;
-            return C4Vector<T> {x_, y_, z_};
+            return C3Vector<T> {x_, y_, z_};
         }
 
         /// Returns a normalized instance of the current vector.
